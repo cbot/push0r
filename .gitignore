@@ -1,3 +1,4 @@
 *.gem
 *.pem
+test.rb
 .DS_Store

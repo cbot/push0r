@@ -11,9 +11,11 @@ class Push0r::ApnsService < Service
 	
 	def init_push
 		ctx = OpenSSL::SSL::SSLContext.new
+		
 		ctx.key = OpenSSL::PKey::RSA.new(@certificate_data, '')
 		ctx.cert = OpenSSL::X509::Certificate.new(@certificate_data)
-		@sock = TCPSocket.new(@sandbox_environment ? "gateway.sandbox.push.apple.com" : "ateway.push.apple.com", 2195)
+				
+		@sock = TCPSocket.new(@sandbox_environment ? "gateway.sandbox.push.apple.com" : "gateway.push.apple.com", 2195)
 		@ssl = OpenSSL::SSL::SSLSocket.new(@sock, ctx)
 		@ssl.connect
 	end
