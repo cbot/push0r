@@ -1,48 +1,91 @@
-include Push0r
-
-class Push0r::ApnsService < Service
-	def initialize(certificate_data, sandbox_environment = false)
-		@certificate_data = certificate_data
-		@sandbox_environment = sandbox_environment
-		@ssl = nil
-		@sock = nil
-		@pushdata = ""
-	end
+module Push0r
+	class ApnsService < Service
+		def initialize(certificate_data, sandbox_environment = false)
+			@certificate_data = certificate_data
+			@sandbox_environment = sandbox_environment
+			@ssl = nil
+			@sock = nil
+			@pushdata = ""
+		end
 	
-	def init_push
-		ctx = OpenSSL::SSL::SSLContext.new
+		def can_send?(message)
+			return message.is_a?(ApnsPushMessage)
+		end
+	
+		def send(message)		
+			receiver_token = message.receiver_token
+			payload = message.payload
+			identifier = message.identifier
 		
-		ctx.key = OpenSSL::PKey::RSA.new(@certificate_data, '')
-		ctx.cert = OpenSSL::X509::Certificate.new(@certificate_data)
-				
-		@sock = TCPSocket.new(@sandbox_environment ? "gateway.sandbox.push.apple.com" : "gateway.push.apple.com", 2195)
-		@ssl = OpenSSL::SSL::SSLSocket.new(@sock, ctx)
-		@ssl.connect
-	end
-	
-	def push_message_object
-		return ApnsPushMessage.new(@pushdata)
-	end
-	
-	def end_push
-		if @pushdata.length > 0 && @ssl
-			@ssl.write(@pushdata)
+			if receiver_token.nil? then raise(ArgumentError, "receiver_token is nil!") end
+			if payload.nil? then raise(ArgumentError, "payload is nil!") end	
 			
-			if IO.select([@ssl], nil, nil, 2)
-				read_buffer = @ssl.read(6)
-				if !read_buffer.nil?
-					message = "ERROR: APNS returned #{read_buffer.unpack("H*")}"
-					puts message
+			receiver_token = receiver_token.gsub(/\s+/, "")
+			if receiver_token.length != 64 then raise(ArgumentError, "invalid receiver_token length!") end			
+		
+			devicetoken = [receiver_token].pack('H*')
+			devicetoken_length = [32].pack("n")
+			devicetoken_item = "\1#{devicetoken_length}#{devicetoken}"
+		
+			if identifier.nil? || identifier.to_i == 0
+				identifier = Random.rand(2**32)
+			end
+			identifier = [identifier.to_i].pack("N")
+			identifier_length = [4].pack("n")
+			identifier_item = "\3#{identifier_length}#{identifier}"
+		
+			expiration_date = [Time.now.to_i + 7 * 24 * 3600].pack("N")
+			expiration_date_length = [4].pack("n")
+			expiration_item = "\4#{expiration_date_length}#{expiration_date}"
+		
+			priority = "\xA" ## default: high priority
+			if payload[:aps] && payload[:aps]["content-available"] && payload[:aps]["content-available"].to_i != 0 && (payload[:aps][:alert].nil? && payload[:aps][:sound].nil? && payload[:aps][:badge].nil?)
+				priority = "\5" ## lower priority for content-available pushes without
+			end
+		
+			priority_length = [1].pack("n")
+			priority_item = "\5#{priority_length}#{priority}"
+		
+			payload = payload.to_json.force_encoding("BINARY")
+			payload_length = [payload.bytesize].pack("n")
+			payload_item = "\2#{payload_length}#{payload}"
+		
+			frame_length = [devicetoken_item.bytesize + payload_item.bytesize + identifier_item.bytesize + expiration_item.bytesize + priority_item.bytesize].pack("N")
+			frame = "\2#{frame_length}#{devicetoken_item}#{payload_item}#{identifier_item}#{expiration_item}#{priority_item}"
+		
+			@pushdata << frame
+		end
+	
+		def init_push
+			ctx = OpenSSL::SSL::SSLContext.new
+		
+			ctx.key = OpenSSL::PKey::RSA.new(@certificate_data, '')
+			ctx.cert = OpenSSL::X509::Certificate.new(@certificate_data)
+				
+			@sock = TCPSocket.new(@sandbox_environment ? "gateway.sandbox.push.apple.com" : "gateway.push.apple.com", 2195)
+			@ssl = OpenSSL::SSL::SSLSocket.new(@sock, ctx)
+			@ssl.connect
+		end
+		
+		def end_push
+			if @pushdata.length > 0 && @ssl
+				@ssl.write(@pushdata)
+			
+				if IO.select([@ssl], nil, nil, 2)
+					read_buffer = @ssl.read(6)
+					if !read_buffer.nil?
+						message = "ERROR: APNS returned #{read_buffer.unpack("H*")}"
+						puts message
+					end
 				end
 			end
-		end
 		
-		unless @ssl.nil?
-			@ssl.close
+			unless @ssl.nil?
+				@ssl.close
+			end
+			unless @sock.nil?
+				@sock.close
+			end
 		end
-		unless @sock.nil?
-			@sock.close
-		end
-		
 	end
 end

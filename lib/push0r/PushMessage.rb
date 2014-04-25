@@ -1,14 +1,24 @@
-class Push0r::PushMessage
-	def initialize(pushdata)
-		@pushdata = pushdata
-	end
+module Push0r
+	class PushMessage
+		attr_reader :payload, :identifier, :receiver_token
 	
-	def send(receiver_token, payload = {}, identifier = nil)
-	end	
+		def initialize(receiver_token, identifier = nil)
+			@receiver_token = receiver_token
+			@identifier = identifier
+			@payload = {}
+		end
 	
-	def send_simple(receiver_token, alert_text = nil, sound = nil, badge = nil, identifier = nil)
+		def attach(payload = {})
+			@payload.merge!(payload)
+			return self
+		end
+	
+		def simple(alert_text = nil, sound = nil, badge = nil, identifier = nil)
+			## empty
+			return self
+		end
 	end
 end
 
-require './push0r/APNS/ApnsPushMessage.rb'
-require './push0r/GCM/GcmPushMessage.rb'
+require_relative 'APNS/ApnsPushMessage'
+require_relative 'GCM/GcmPushMessage'

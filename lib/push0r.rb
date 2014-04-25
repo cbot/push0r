@@ -2,8 +2,6 @@ require 'socket'
 require 'openssl'
 require 'json'
 
-module Push0r
-end
-
-require './push0r/Service.rb'
-require './push0r/PushMessage.rb'
+require_relative 'push0r/Queue'
+require_relative 'push0r/Service'
+require_relative 'push0r/PushMessage'

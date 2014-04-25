@@ -1,20 +1,23 @@
-class Push0r::Service
-	def push(&block)
-		self.init_push
-		block.call(self.push_message_object)
-		self.end_push
-	end
+module Push0r
+	class Service
+		def can_send?(message)
+			return false
+		end
 	
-	private
-	def init_push
-	end
+		def send(message)
+			## empty
+		end
 	
-	def push_message_object	
-	end
+		private
+		def init_push
+			## empty
+		end
 	
-	def end_push
+		def end_push
+			## empty
+		end
 	end
 end
 
-require './push0r/APNS/ApnsService.rb'
-require './push0r/GCM/GcmService.rb'
+require_relative 'APNS/ApnsService'
+require_relative 'GCM/GcmService'

@@ -1,5 +1,6 @@
-include Push0r
-
-class Push0r::GcmPushMessage < PushMessage
-	
+module Push0r
+	class GcmPushMessage < PushMessage
+		
+	end
 end
+
