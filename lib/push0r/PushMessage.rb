@@ -13,7 +13,7 @@ module Push0r
 			return self
 		end
 	
-		def simple(alert_text = nil, sound = nil, badge = nil, identifier = nil)
+		def simple(alert_text = nil, sound = nil, badge = nil)
 			## empty
 			return self
 		end

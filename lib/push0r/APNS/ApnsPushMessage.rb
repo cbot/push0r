@@ -1,6 +1,16 @@
 module Push0r
 	class ApnsPushMessage < PushMessage		
-		def simple(alert_text = nil, sound = nil, badge = nil, identifier = nil)
+		def initialize(receiver_token, identifier = nil)
+			super(receiver_token, identifier)
+			
+			if @dentifier.nil?
+				@identifier = Random.rand(2**32)
+			end
+		end
+		
+		def simple(alert_text = nil, sound = nil, badge = nil)
+			super(alert_text, sound, badge)
+			
 			new_payload = {aps: {}}
 			if alert_text
 				new_payload[:aps][:alert] = alert_text
@@ -10,9 +20,9 @@ module Push0r
 			end
 			if badge
 				new_payload[:aps][:badge] = bade
-			end
-		
+			end		
 			@payload.merge!(new_payload)
+			
 			return self
 		end
 	end

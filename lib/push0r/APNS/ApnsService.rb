@@ -5,14 +5,65 @@ module Push0r
 			@sandbox_environment = sandbox_environment
 			@ssl = nil
 			@sock = nil
-			@pushdata = ""
+			@messages = []
 		end
 	
 		def can_send?(message)
 			return message.is_a?(ApnsPushMessage)
 		end
 	
-		def send(message)		
+		def send(message)
+			@messages << message
+		end
+		
+		def init_push
+			# not used for apns
+		end
+		
+		def end_push
+			begin
+				setup_ssl
+				(result, error_identifier, error_code) = transmit_messages
+				if result == false 
+					reset_message(error_identifier)
+					if @messages.empty? then result = true end
+				end
+			end while result != true
+		
+			unless @ssl.nil?
+				@ssl.close
+			end
+			unless @sock.nil?
+				@sock.close
+			end
+		end
+	
+		private
+		def setup_ssl
+			ctx = OpenSSL::SSL::SSLContext.new
+		
+			ctx.key = OpenSSL::PKey::RSA.new(@certificate_data, '')
+			ctx.cert = OpenSSL::X509::Certificate.new(@certificate_data)
+				
+			@sock = TCPSocket.new(@sandbox_environment ? "gateway.sandbox.push.apple.com" : "gateway.push.apple.com", 2195)
+			@ssl = OpenSSL::SSL::SSLSocket.new(@sock, ctx)
+			@ssl.connect
+		end
+		
+		def reset_message(error_identifier)
+			index = @messages.find_index {|o| o.identifier == error_identifier}
+			
+			if index.nil? ## this should never happen actually
+				@messages = []
+			elsif index < @messages.length - 1 # reset @messages to contain all messages after the one that has failed
+				@messages = @messages[index+1, @messages.length]
+			else ## the very last message failed, so there's nothing left to be sent
+				@messages = []
+			end
+		end
+		
+		
+		def create_push_frame(message)
 			receiver_token = message.receiver_token
 			payload = message.payload
 			identifier = message.identifier
@@ -27,9 +78,6 @@ module Push0r
 			devicetoken_length = [32].pack("n")
 			devicetoken_item = "\1#{devicetoken_length}#{devicetoken}"
 		
-			if identifier.nil? || identifier.to_i == 0
-				identifier = Random.rand(2**32)
-			end
 			identifier = [identifier.to_i].pack("N")
 			identifier_length = [4].pack("n")
 			identifier_item = "\3#{identifier_length}#{identifier}"
@@ -40,7 +88,7 @@ module Push0r
 		
 			priority = "\xA" ## default: high priority
 			if payload[:aps] && payload[:aps]["content-available"] && payload[:aps]["content-available"].to_i != 0 && (payload[:aps][:alert].nil? && payload[:aps][:sound].nil? && payload[:aps][:badge].nil?)
-				priority = "\5" ## lower priority for content-available pushes without
+				priority = "\5" ## lower priority for content-available pushes without alert/sound/badge
 			end
 		
 			priority_length = [1].pack("n")
@@ -53,39 +101,34 @@ module Push0r
 			frame_length = [devicetoken_item.bytesize + payload_item.bytesize + identifier_item.bytesize + expiration_item.bytesize + priority_item.bytesize].pack("N")
 			frame = "\2#{frame_length}#{devicetoken_item}#{payload_item}#{identifier_item}#{expiration_item}#{priority_item}"
 		
-			@pushdata << frame
-		end
-	
-		def init_push
-			ctx = OpenSSL::SSL::SSLContext.new
-		
-			ctx.key = OpenSSL::PKey::RSA.new(@certificate_data, '')
-			ctx.cert = OpenSSL::X509::Certificate.new(@certificate_data)
-				
-			@sock = TCPSocket.new(@sandbox_environment ? "gateway.sandbox.push.apple.com" : "gateway.push.apple.com", 2195)
-			@ssl = OpenSSL::SSL::SSLSocket.new(@sock, ctx)
-			@ssl.connect
+			return frame
 		end
 		
-		def end_push
-			if @pushdata.length > 0 && @ssl
-				@ssl.write(@pushdata)
+		def transmit_messages
+			if @messages.empty? || @ssl.nil?
+				return [true, nil, nil]
+			end
 			
-				if IO.select([@ssl], nil, nil, 2)
-					read_buffer = @ssl.read(6)
-					if !read_buffer.nil?
-						message = "ERROR: APNS returned #{read_buffer.unpack("H*")}"
-						puts message
-					end
+			pushdata = ""
+			@messages.each do |message|
+				pushdata << create_push_frame(message)
+			end
+			
+			@ssl.write(pushdata)
+		
+			if IO.select([@ssl], nil, nil, 2)
+				read_buffer = @ssl.read(6)
+				if !read_buffer.nil?
+					cmd = read_buffer[0].unpack("C").first
+					error_code = read_buffer[1].unpack("C").first
+					identifier = read_buffer[2,4].unpack("N").first
+					puts "ERROR: APNS returned error code #{error_code} #{identifier}"
+					return [false, identifier, error_code]
+				else
+					return [true, nil, nil]
 				end
 			end
-		
-			unless @ssl.nil?
-				@ssl.close
-			end
-			unless @sock.nil?
-				@sock.close
-			end
+			return [true, nil, nil]
 		end
 	end
 end
