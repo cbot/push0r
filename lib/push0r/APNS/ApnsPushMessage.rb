@@ -3,7 +3,7 @@ module Push0r
 		def initialize(receiver_token, identifier = nil)
 			super(receiver_token, identifier)
 			
-			if @dentifier.nil?
+			if @dentifier.nil? ## make sure the message has an identifier (required for apns error handling)
 				@identifier = Random.rand(2**32)
 			end
 		end
