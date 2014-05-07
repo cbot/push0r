@@ -54,7 +54,7 @@ module Push0r
 					response = http.request(request)
 				rescue SocketError => e
 					## connection error
-					failed_messages << {:error_code => Push0r::GcmErrorCodes::CONNECTION_ERROR, :identifier => message.identifier, :receivers => message.receiver_token}
+					failed_messages << {:error_code => Push0r::GcmErrorCodes::CONNECTION_ERROR, :message => message, :receivers => message.receiver_token}
 					next
 				end
 				
@@ -71,7 +71,7 @@ module Push0r
 							registration_id = result["registration_id"]
 							
 							if message_id && registration_id
-								new_registration_messages << {:identifier => message.identifier, :receiver => receiver_token, :new_receiver => registration_id}
+								new_registration_messages << {:message => message, :receiver => receiver_token, :new_receiver => registration_id}
 							elsif error
 								error_code = Push0r::GcmErrorCodes::UNKNOWN_ERROR
 								if error == "InvalidRegistration"
@@ -100,13 +100,13 @@ module Push0r
 						
 						## if there are any receivers with errors: add a hash for every distinct error code and the related receivers to the failed_messages array
 						error_receivers.each do |error_code, receivers|
-							failed_messages << {:error_code => error_code, :identifier => message.identifier, :receivers => receivers}
+							failed_messages << {:error_code => error_code, :message => message, :receivers => receivers}
 						end
 					end
 				elsif response.code.to_i >= 500 && response.code.to_i <= 599
 					failed_messages << {:error_code => Push0r::GcmErrorCodes::INTERNAL_ERROR, :identifier => message.identifier, :receivers => message.receiver_token}
 				else
-					failed_messages << {:error_code => response.code.to_i, :identifier => message.identifier, :receivers => message.receiver_token}
+					failed_messages << {:error_code => response.code.to_i, :message => message, :receivers => message.receiver_token}
 				end
 			end
 				
