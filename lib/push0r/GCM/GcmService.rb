@@ -7,11 +7,17 @@ module Push0r
 		UNABLE_TO_PARSE_JSON	= 400
 		NOT_AUTHENTICATED 		= 401
 		INTERNAL_ERROR			= 500
-		INVALID_REGISTRATION	= 1
-		UNAVAILABLE				= 2
-		NOT_REGISTERED			= 3
-		UNKNOWN_ERROR			= 4
-		CONNECTION_ERROR		= 5
+		UNKNOWN_ERROR			= 1
+		INVALID_REGISTRATION	= 2
+		UNAVAILABLE				= 3
+		NOT_REGISTERED			= 4
+		MISMATCH_SENDER_ID		= 5
+		MISSING_REGISTRATION	= 6
+		MESSAGE_TOO_BIG			= 7
+		INVALID_DATA_KEY		= 8
+		INVALID_TTL				= 9
+		INVALID_PACKAGE_NAME	= 10
+		CONNECTION_ERROR		= 11
 	end
 	
 	class GcmService < Service
@@ -37,7 +43,7 @@ module Push0r
 			failed_messages = []
 			new_registration_messages = []
 			
-			uri = URI.parse("https://android.googleapiss.com/gcm/send")
+			uri = URI.parse("https://android.googleapis.com/gcm/send")
 			http = Net::HTTP.new(uri.host, uri.port)
 			http.use_ssl = true
 
@@ -69,11 +75,23 @@ module Push0r
 							elsif error
 								error_code = Push0r::GcmErrorCodes::UNKNOWN_ERROR
 								if error == "InvalidRegistration"
-									error_code == Push0r::GcmErrorCodes::INVALID_REGISTRATION
+									error_code = Push0r::GcmErrorCodes::INVALID_REGISTRATION
 								elsif error == "Unavailable"
-									error_code == Push0r::GcmErrorCodes::UNAVAILABLE
+									error_code = Push0r::GcmErrorCodes::UNAVAILABLE
 								elsif error == "NotRegistered"
-									error_code == Push0r::GcmErrorCodes::NOT_REGISTERED
+									error_code = Push0r::GcmErrorCodes::NOT_REGISTERED
+								elsif error == "MismatchSenderId"
+									error_code = Push0r::GcmErrorCodes::MISMATCH_SENDER_ID
+								elsif error == "MissingRegistration"
+									error_code = Push0r::GcmErrorCodes::MISSING_REGISTRATION
+								elsif error == "MessageTooBig"
+									error_code = Push0r::GcmErrorCodes::MESSAGE_TOO_BIG
+								elsif error == "InvalidDataKey"
+									error_code = Push0r::GcmErrorCodes::INVALID_DATA_KEY	
+								elsif error == "InvalidTtl"
+									error_code = Push0r::GcmErrorCodes::INVALID_TTL
+								elsif error == "InvalidPackageName"
+									error_code = Push0r::GcmErrorCodes::INVALID_PACKAGE_NAME
 								end
 								if error_receivers[error_code].nil? then error_receivers[error_code] = [] end
 								error_receivers[error_code] << receiver_token
