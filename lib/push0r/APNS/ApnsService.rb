@@ -1,5 +1,5 @@
 module Push0r
-	module ErrorCodes
+	module ApnsErrorCodes
 		NO_ERROR 				= 0
 		PROCESSING_ERROR 		= 1
 		MISSING_DEVICE_TOKEN 	= 2
@@ -52,7 +52,7 @@ module Push0r
 			unless @sock.nil?
 				@sock.close
 			end
-			return failed_messages
+			return [failed_messages, []]
 		end
 	
 		private

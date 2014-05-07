@@ -8,14 +8,13 @@ module Push0r
 			## empty
 		end
 	
-		private
 		def init_push
 			## empty
 		end
 	
 		def end_push
 			## empty
-			return []
+			return [[], []]
 		end
 	end
 end

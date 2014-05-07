@@ -12,11 +12,6 @@ module Push0r
 			@payload.merge!(payload)
 			return self
 		end
-	
-		def simple(alert_text = nil, sound = nil, badge = nil)
-			## empty
-			return self
-		end
 	end
 end
 

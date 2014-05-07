@@ -29,7 +29,7 @@ module Push0r
 				messages.each do |message|
 					service.send(message)
 				end
-				service.end_push
+				puts service.end_push
 			end
 		end
 	end
