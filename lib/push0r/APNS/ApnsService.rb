@@ -1,5 +1,5 @@
 module Push0r
-	module ErrorCodes
+	module ApnsErrorCodes
 		NO_ERROR 				= 0
 		PROCESSING_ERROR 		= 1
 		MISSING_DEVICE_TOKEN 	= 2
@@ -38,9 +38,9 @@ module Push0r
 			failed_messages = []
 			begin
 				setup_ssl
-				(result, error_identifier, error_code) = transmit_messages
+				(result, error_message, error_code) = transmit_messages
 				if result == false 
-					failed_messages << {:error_code => error_code, :identifier => error_identifier}
+					failed_messages << {:error_code => error_code, :message => error_message}
 					reset_message(error_identifier)
 					if @messages.empty? then result = true end
 				end
@@ -52,7 +52,7 @@ module Push0r
 			unless @sock.nil?
 				@sock.close
 			end
-			return failed_messages
+			return [failed_messages, []]
 		end
 	
 		private
@@ -78,7 +78,6 @@ module Push0r
 				@messages = []
 			end
 		end
-		
 		
 		def create_push_frame(message)
 			receiver_token = message.receiver_token
@@ -140,12 +139,21 @@ module Push0r
 					error_code = read_buffer[1].unpack("C").first
 					identifier = read_buffer[2,4].unpack("N").first
 					puts "ERROR: APNS returned error code #{error_code} #{identifier}"
-					return [false, identifier, error_code]
+					return [false, message_for_identifier(identifier), error_code]
 				else
 					return [true, nil, nil]
 				end
 			end
 			return [true, nil, nil]
+		end
+		
+		def message_for_identifier(identifier)
+			index = @messages.find_index {|o| o.identifier == identifier}
+			if index.nil?
+				return nil
+			else
+				return @messages[index]
+			end
 		end
 	end
 end
