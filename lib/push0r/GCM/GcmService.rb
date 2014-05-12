@@ -51,7 +51,7 @@ module Push0r
 					request = Net::HTTP::Post.new(uri.path, {"Content-Type" => "application/json", "Authorization" => "key=#{@api_key}"})
 					request.body = message.attach({"registration_ids" => message.receiver_token}).payload.to_json
 					response = http.request(request)
-				rescue SocketError => e
+				rescue SocketError
 					## connection error
 					failed_messages << {:error_code => Push0r::GcmErrorCodes::CONNECTION_ERROR, :message => message, :receivers => message.receiver_token}
 					next

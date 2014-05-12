@@ -135,7 +135,7 @@ module Push0r
 			if IO.select([@ssl], nil, nil, 2)
 				read_buffer = @ssl.read(6)
 				if !read_buffer.nil?
-					cmd = read_buffer[0].unpack("C").first
+					#cmd = read_buffer[0].unpack("C").first
 					error_code = read_buffer[1].unpack("C").first
 					identifier = read_buffer[2,4].unpack("N").first
 					puts "ERROR: APNS returned error code #{error_code} #{identifier}"
