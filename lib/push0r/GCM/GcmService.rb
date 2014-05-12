@@ -5,7 +5,7 @@ module Push0r
 	module GcmErrorCodes
 		NO_ERROR 				= 0
 		UNABLE_TO_PARSE_JSON	= 400
-		NOT_AUTHENTICATED 		= 401
+		NOT_AUTHENTICATED		= 401
 		INTERNAL_ERROR			= 500
 		UNKNOWN_ERROR			= 1
 		INVALID_REGISTRATION	= 2
@@ -21,9 +21,8 @@ module Push0r
 	end
 	
 	class GcmService < Service
-		def initialize(api_key, sender_id)
+		def initialize(api_key)
 			@api_key = api_key
-			@sender_id = sender_id
 			@messages = []
 		end
 		
