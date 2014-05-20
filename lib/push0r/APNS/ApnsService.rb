@@ -136,7 +136,11 @@ module Push0r
 			@ssl.write(pushdata)
 		
 			if IO.select([@ssl], nil, nil, 2)
-				read_buffer = @ssl.read(6)
+				begin
+					read_buffer = @ssl.read(6)
+				rescue Exception
+					return [true, nil, nil]
+				end
 				if !read_buffer.nil?
 					#cmd = read_buffer[0].unpack("C").first
 					error_code = read_buffer[1].unpack("C").first
