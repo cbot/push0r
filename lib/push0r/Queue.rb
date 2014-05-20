@@ -25,13 +25,20 @@ module Push0r
 		end
 	
 		def flush
+			failed_messages = []
+			new_registration_messages = []
+			
 			@queued_messages.each do |service, messages|
 				service.init_push
 				messages.each do |message|
 					service.send(message)
 				end
-				service.end_push
+				(failed, new_registration) = service.end_push
+				failed_messages += failed
+				new_registration_messages += new_registration
 			end
+			@queued_messages = []
+			return [failed_messages, new_registration_messages]
 		end
 	end
 end

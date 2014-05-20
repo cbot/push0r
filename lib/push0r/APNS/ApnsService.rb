@@ -83,6 +83,7 @@ module Push0r
 			receiver_token = message.receiver_token
 			payload = message.payload
 			identifier = message.identifier
+			time_to_live = (message.time_to_live.nil? || message.time_to_live.to_i < 0) ? 0 : message.time_to_live.to_i
 		
 			if receiver_token.nil? then raise(ArgumentError, "receiver_token is nil!") end
 			if payload.nil? then raise(ArgumentError, "payload is nil!") end	
@@ -98,7 +99,7 @@ module Push0r
 			identifier_length = [4].pack("n")
 			identifier_item = "\3#{identifier_length}#{identifier}"
 		
-			expiration_date = [Time.now.to_i + 7 * 24 * 3600].pack("N")
+			expiration_date = [(time_to_live > 0 ? Time.now.to_i + time_to_live : 0)].pack("N")
 			expiration_date_length = [4].pack("n")
 			expiration_item = "\4#{expiration_date_length}#{expiration_date}"
 		

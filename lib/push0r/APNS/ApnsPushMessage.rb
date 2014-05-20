@@ -1,10 +1,10 @@
 module Push0r
 	class ApnsPushMessage < PushMessage		
-		def initialize(receiver_token, identifier = nil)
+		def initialize(receiver_token, identifier = nil, time_to_live = nil)
 			if identifier.nil? ## make sure the message has an identifier (required for apns error handling)
 				identifier = Random.rand(2**32)
 			end
-			super(receiver_token, identifier)
+			super(receiver_token, identifier, time_to_live)
 		end
 		
 		def simple(alert_text = nil, sound = nil, badge = nil)

@@ -1,6 +1,6 @@
 module Push0r
 	class GcmPushMessage < PushMessage
-		def initialize(receiver_token, identifier = nil)
+		def initialize(receiver_token, identifier = nil, time_to_live = nil)
 			if identifier.nil? ## make sure the message has an identifier
 				identifier = Random.rand(2**32)
 			end
@@ -10,7 +10,11 @@ module Push0r
 				receiver_token = [receiver_token]
 			end
 			
-			super(receiver_token, identifier)
+			super(receiver_token, identifier, time_to_live)
+			
+			if time_to_live && time_to_live.to_i >= 0
+				self.attach({"time_to_live" => time_to_live.to_i})
+			end
 		end
 	end
 end
