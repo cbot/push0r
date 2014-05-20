@@ -37,7 +37,7 @@ module Push0r
 				failed_messages += failed
 				new_registration_messages += new_registration
 			end
-			@queued_messages = []
+			@queued_messages = {}
 			return [failed_messages, new_registration_messages]
 		end
 	end
