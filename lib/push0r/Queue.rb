@@ -18,9 +18,10 @@ module Push0r
 						@queued_messages[service] = []
 					end
 					@queued_messages[service] << message
-					return
+					return true
 				end
 			end
+			return false
 		end
 	
 		def flush
@@ -29,7 +30,7 @@ module Push0r
 				messages.each do |message|
 					service.send(message)
 				end
-				puts service.end_push
+				service.end_push
 			end
 		end
 	end
