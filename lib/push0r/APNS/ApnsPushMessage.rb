@@ -8,8 +8,6 @@ module Push0r
 		end
 		
 		def simple(alert_text = nil, sound = nil, badge = nil)
-			super(alert_text, sound, badge)
-			
 			new_payload = {aps: {}}
 			if alert_text
 				new_payload[:aps][:alert] = alert_text
