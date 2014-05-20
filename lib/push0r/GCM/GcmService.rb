@@ -109,6 +109,7 @@ module Push0r
 				end
 			end
 				
+			@messages = [] ## reset	
 			return [failed_messages, new_registration_messages]
 		end
 	end

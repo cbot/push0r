@@ -52,6 +52,8 @@ module Push0r
 			unless @sock.nil?
 				@sock.close
 			end
+			
+			@messages = [] ## reset
 			return [failed_messages, []]
 		end
 	
