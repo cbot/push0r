@@ -3,3 +3,6 @@
 *.p12
 test.rb
 .DS_Store
+
+/.yardoc/
+/doc/
