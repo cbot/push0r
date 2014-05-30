@@ -1,5 +1,6 @@
 push0r
 ======
+[![Gem Version](https://badge.fury.io/rb/Push0r.svg)](http://badge.fury.io/rb/Push0r)
 
 push0r is a ruby library that makes it easy to send push notifications to iOS, OSX and Android users.
 
