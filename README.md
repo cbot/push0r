@@ -45,6 +45,18 @@ queue.add(apns_message)
 queue.flush
 ```
 
+## Documentation
+Push0r API documentation can be found [here][apidocs].
+
+## Error handling
+[Queue#flush][flush] returns an instance of [FlushResult][flushresult] which can be queried for [failed_messages][failed_messages]. This returns an array of [FailedMessage][failed_message] instances which in turn offer various attributes like the error code for the failed notification.
+
+## Bugs
 Please [report bugs][issues] on GitHub.
 
 [issues]: https://github.com/cbot/push0r/issues
+[apidocs]: http://rubydoc.info/gems/Push0r/frames
+[flush]: http://rubydoc.info/gems/Push0r/Push0r/Queue#flush-instance_method
+[flushresult]: http://rubydoc.info/gems/Push0r/Push0r/FlushResult
+[failed_messages]: http://rubydoc.info/gems/Push0r/Push0r/FlushResult#failed_messages-instance_method
+[failed_message]: http://rubydoc.info/gems/Push0r/Push0r/FailedMessage
