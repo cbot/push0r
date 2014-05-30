@@ -24,6 +24,10 @@ module Push0r
 			@receivers = receivers
 			@message = message
 		end
+		
+		def to_s
+			"FailedMessage: errorCode: #{@error_code} receivers: #{@receivers.inspect}"
+		end
 	end
 	
 	class NewTokenMessage
@@ -35,6 +39,10 @@ module Push0r
 			@token = token
 			@new_token = new_token
 			@message = message
+		end
+		
+		def to_s
+			"NewTokenMessage: oldToken: #{@token} newToken: #{@new_token}"
 		end
 	end
 end
