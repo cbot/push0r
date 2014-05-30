@@ -56,7 +56,7 @@ module Push0r
 				(result, error_message, error_code) = transmit_messages
 				if result == false
 					failed_messages << FailedMessage.new(error_code, error_message.receiver_token, error_message)
-					reset_message(error_identifier)
+					reset_message(error_message.identifier)
 					if @messages.empty? then result = true end
 				end
 			end while result != true
