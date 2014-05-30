@@ -7,7 +7,7 @@ module Push0r
 	# @attr_reader [Fixnum] time_to_live the time to live in seconds for this push message
 	class PushMessage
 		attr_reader :payload, :identifier, :receiver_token, :time_to_live
-	
+
 		# Creates a new PushMessage instance
 		# @param receiver_token [String, Array] the receiver's push token. Some subclasses might also accept an Array of tokens.
 		# @param identifier [Fixnum] a unique identifier to identify this push message during error handling. If nil, a random identifier is automatically generated.
@@ -18,7 +18,7 @@ module Push0r
 			@time_to_live = time_to_live
 			@payload = {}
 		end
-	
+
 		# Attaches the given payload to the push message.
 		# @note attaching is done using the merge! method of the Hash class, i.e. be careful not to overwrite previously set Hash keys.
 		# @param payload [Hash] the payload to attach to the message.

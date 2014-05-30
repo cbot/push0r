@@ -44,6 +44,6 @@ queue.add(apns_message)
 queue.flush
 ```
 
-Please [Report bugs][issues] on GitHub.
+Please [report bugs][issues] on GitHub.
 
 [issues]: https://github.com/cbot/push0r/issues

@@ -55,22 +55,22 @@ module Push0r
 		end
 	
 		# Flushes the queue by transmitting the enqueued messages using the registered services
-		# @return [Array(Array<String>, Array<String>)] Failed new RegId Messages
+		# @return [FlushResult] the result of the operation
 		def flush
 			failed_messages = []
-			new_registration_messages = []
+			new_token_messages = []
 			
 			@queued_messages.each do |service, messages|
 				service.init_push
 				messages.each do |message|
 					service.send(message)
 				end
-				(failed, new_registration) = service.end_push
+				(failed, new_token) = service.end_push
 				failed_messages += failed
-				new_registration_messages += new_registration
+				new_token_messages += new_token
 			end
 			@queued_messages = {}
-			return [failed_messages, new_registration_messages]
+			return FlushResult.new(failed_messages, new_token_messages)
 		end
 	end
 end

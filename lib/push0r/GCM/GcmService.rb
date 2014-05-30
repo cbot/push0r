@@ -1,10 +1,9 @@
 require 'net/http'
 
 module Push0r
-	
+
 	# A module that contains constants for Google Cloud Messaging error codes
 	module GcmErrorCodes
-		NO_ERROR 				= 0
 		UNKNOWN_ERROR			= 1
 		INVALID_REGISTRATION	= 2
 		UNAVAILABLE				= 3
@@ -20,7 +19,7 @@ module Push0r
 		NOT_AUTHENTICATED		= 401
 		INTERNAL_ERROR			= 500
 	end
-	
+
 	# GcmService is a {Service} implementation to push notifications to Android users using the Google Cloud Messaging Service.
 	# @example
 	#   queue = Push0r::Queue.new
@@ -28,34 +27,34 @@ module Push0r
 	#   gcm_service = Push0r::GcmService.new("__gcm_api_token__")
 	#   queue.register_service(gcm_service)
 	class GcmService < Service
-		
+
 		# Returns a new ApnsService instance
 		# @param api_key [String] the GCM API key obtained from the Google Developers Console
 		def initialize(api_key)
 			@api_key = api_key
 			@messages = []
 		end
-		
+
 		# @see Service#can_send?
 		def can_send?(message)
 			return message.is_a?(GcmPushMessage)
 		end
-		
+
 		# @see Service#send
 		def send(message)
 			@messages << message
 		end
-		
+
 		# @see Service#init_push
 		def init_push
 			## not used for gcm
 		end
-		
+
 		# @see Service#end_push
 		def end_push
 			failed_messages = []
 			new_registration_messages = []
-			
+
 			uri = URI.parse("https://android.googleapis.com/gcm/send")
 			http = Net::HTTP.new(uri.host, uri.port)
 			http.use_ssl = true
@@ -67,24 +66,24 @@ module Push0r
 					response = http.request(request)
 				rescue SocketError
 					## connection error
-					failed_messages << {:error_code => Push0r::GcmErrorCodes::CONNECTION_ERROR, :message => message, :receivers => message.receiver_token}
+					failed_messages << FailedMessage.new(Push0r::GcmErrorCodes::CONNECTION_ERROR, message.receiver_token, message)
 					next
 				end
-				
+
 				if response.code.to_i == 200
 					json = JSON.parse(response.body)
-					
+
 					if json["failure"].to_i > 0 || json["canonical_ids"].to_i > 0
 						error_receivers = {}
-						
+
 						json["results"].each_with_index do |result,i|
 							receiver_token = message.receiver_token[i]
 							error = result["error"]
 							message_id = result["message_id"]
 							registration_id = result["registration_id"]
-							
+
 							if message_id && registration_id
-								new_registration_messages << {:message => message, :receiver => receiver_token, :new_receiver => registration_id}
+								new_registration_messages << NewTokenMessage.new(receiver_token, registration_id, message)
 							elsif error
 								error_code = Push0r::GcmErrorCodes::UNKNOWN_ERROR
 								if error == "InvalidRegistration"
@@ -100,7 +99,7 @@ module Push0r
 								elsif error == "MessageTooBig"
 									error_code = Push0r::GcmErrorCodes::MESSAGE_TOO_BIG
 								elsif error == "InvalidDataKey"
-									error_code = Push0r::GcmErrorCodes::INVALID_DATA_KEY	
+									error_code = Push0r::GcmErrorCodes::INVALID_DATA_KEY
 								elsif error == "InvalidTtl"
 									error_code = Push0r::GcmErrorCodes::INVALID_TTL
 								elsif error == "InvalidPackageName"
@@ -110,20 +109,20 @@ module Push0r
 								error_receivers[error_code] << receiver_token
 							end
 						end
-						
+
 						## if there are any receivers with errors: add a hash for every distinct error code and the related receivers to the failed_messages array
 						error_receivers.each do |error_code, receivers|
-							failed_messages << {:error_code => error_code, :message => message, :receivers => receivers}
+							failed_messages << FailedMessage.new(error_code, receivers, message)
 						end
 					end
 				elsif response.code.to_i >= 500 && response.code.to_i <= 599
-					failed_messages << {:error_code => Push0r::GcmErrorCodes::INTERNAL_ERROR, :message => message, :receivers => message.receiver_token}
+					failed_messages << FailedMessage.new(Push0r::GcmErrorCodes::INTERNAL_ERROR, message.receiver_token, message)
 				else
-					failed_messages << {:error_code => response.code.to_i, :message => message, :receivers => message.receiver_token}
+					failed_messages << FailedMessage.new(response.code.to_i, message.receiver_token, message)
 				end
 			end
-				
-			@messages = [] ## reset	
+
+			@messages = [] ## reset
 			return [failed_messages, new_registration_messages]
 		end
 	end
