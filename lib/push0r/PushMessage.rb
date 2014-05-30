@@ -4,7 +4,7 @@ module Push0r
 	# @attr_reader [Hash] payload the payload for this push message
 	# @attr_reader [Fixnum] identifier the unique identifier for this push message
 	# @attr_reader [String, Array] receiver_token the receiver's push token
-	# @attr_reader [Fixnum] :time_to_live the time to live in seconds for this push message
+	# @attr_reader [Fixnum] time_to_live the time to live in seconds for this push message
 	class PushMessage
 		attr_reader :payload, :identifier, :receiver_token, :time_to_live
 	
@@ -22,7 +22,7 @@ module Push0r
 		# Attaches the given payload to the push message.
 		# @note attaching is done using the merge! method of the Hash class, i.e. be careful not to overwrite previously set Hash keys.
 		# @param payload [Hash] the payload to attach to the message.
-		# @return [PushMessage] self
+		# @return [self] self
 		def attach(payload = {})
 			@payload.merge!(payload)
 			return self

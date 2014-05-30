@@ -2,11 +2,9 @@ require 'net/http'
 
 module Push0r
 	
+	# A module that contains constants for Google Cloud Messaging error codes
 	module GcmErrorCodes
 		NO_ERROR 				= 0
-		UNABLE_TO_PARSE_JSON	= 400
-		NOT_AUTHENTICATED		= 401
-		INTERNAL_ERROR			= 500
 		UNKNOWN_ERROR			= 1
 		INVALID_REGISTRATION	= 2
 		UNAVAILABLE				= 3
@@ -18,26 +16,42 @@ module Push0r
 		INVALID_TTL				= 9
 		INVALID_PACKAGE_NAME	= 10
 		CONNECTION_ERROR		= 11
+		UNABLE_TO_PARSE_JSON	= 400
+		NOT_AUTHENTICATED		= 401
+		INTERNAL_ERROR			= 500
 	end
 	
+	# GcmService is a {Service} implementation to push notifications to Android users using the Google Cloud Messaging Service.
+	# @example
+	#   queue = Push0r::Queue.new
+	#
+	#   gcm_service = Push0r::GcmService.new("__gcm_api_token__")
+	#   queue.register_service(gcm_service)
 	class GcmService < Service
+		
+		# Returns a new ApnsService instance
+		# @param api_key [String] the GCM API key obtained from the Google Developers Console
 		def initialize(api_key)
 			@api_key = api_key
 			@messages = []
 		end
 		
+		# @see Service#can_send?
 		def can_send?(message)
 			return message.is_a?(GcmPushMessage)
 		end
 		
+		# @see Service#send
 		def send(message)
 			@messages << message
 		end
 		
+		# @see Service#init_push
 		def init_push
 			## not used for gcm
 		end
 		
+		# @see Service#end_push
 		def end_push
 			failed_messages = []
 			new_registration_messages = []

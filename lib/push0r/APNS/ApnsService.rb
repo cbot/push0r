@@ -1,4 +1,6 @@
 module Push0r
+	
+	# A module that contains Apple Push Notification Service error codes
 	module ApnsErrorCodes
 		NO_ERROR 				= 0
 		PROCESSING_ERROR 		= 1
@@ -13,7 +15,17 @@ module Push0r
 		NONE 					= 255
 	end
 	
+	# ApnsService is a {Service} implementation to push notifications to iOS and OSX users using the Apple Push Notification Service.
+	# @example
+	#   queue = Push0r::Queue.new
+	#
+	#   apns_service = Push0r::ApnsService.new(File.read("aps.pem"), true)
+	#   queue.register_service(apns_service)
 	class ApnsService < Service
+		
+		# Returns a new ApnsService instance
+		# @param certificate_data [String] the Apple push certificate in PEM format
+		# @param sandbox_environment [Boolean] true if the sandbox push server should be used, otherwise false
 		def initialize(certificate_data, sandbox_environment = false)
 			@certificate_data = certificate_data
 			@sandbox_environment = sandbox_environment
@@ -22,18 +34,22 @@ module Push0r
 			@messages = []
 		end
 	
+		# @see Service#can_send?
 		def can_send?(message)
 			return message.is_a?(ApnsPushMessage)
 		end
 	
+		# @see Service#send
 		def send(message)
 			@messages << message
 		end
 		
+		# @see Service#init_push
 		def init_push
 			# not used for apns
 		end
 		
+		# @see Service#end_push
 		def end_push
 			failed_messages = []
 			begin
