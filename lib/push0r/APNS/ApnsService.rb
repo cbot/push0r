@@ -51,8 +51,14 @@ module Push0r
 		# @see Service#end_push
 		def end_push
 			failed_messages = []
+			result = false
 			begin
-				setup_ssl
+				begin
+					setup_ssl(true)
+				rescue SocketError => e
+					puts "Error: #{e}"
+					break
+				end
 				(result, error_message, error_code) = transmit_messages
 				if result == false
 					failed_messages << FailedMessage.new(error_code, error_message.receiver_token, error_message)
@@ -61,27 +67,62 @@ module Push0r
 				end
 			end while result != true
 
+			close_ssl
+
+			@messages = [] ## reset
+			return [failed_messages, []]
+		end
+
+		# Calls the APNS feedback service and returns an array of expired push tokens
+		# @return [Array<String>] an array of expired push tokens
+		def get_feedback
+			tokens = []
+			
+			begin
+				setup_ssl(true)
+			rescue SocketError => e
+				puts "Error: #{e}"
+				return tokens
+			end
+			
+			if IO.select([@ssl], nil, nil, 0.5)
+				while line = @ssl.read(38)			
+					f = line.unpack('N1n1H64')
+					time = Time.at(f[0])
+					token = f[2].scan(/.{8}/).join(" ")
+					tokens << token
+				end	
+			end
+	
+			close_ssl
+			
+			return tokens
+		end
+
+		private
+		def setup_ssl(for_feedback = false)
+			close_ssl
+			ctx = OpenSSL::SSL::SSLContext.new
+
+			ctx.key = OpenSSL::PKey::RSA.new(@certificate_data, '')
+			ctx.cert = OpenSSL::X509::Certificate.new(@certificate_data)
+			
+			unless for_feedback
+				@sock = TCPSocket.new(@sandbox_environment ? "gateway.sandbox.push.apple.com" : "gateway.push.apple.com", 2195)
+			else
+				@sock = TCPSocket.new(@sandbox_environment ? "feedback.sandbox.push.apple.com" : "feedback.push.apple.com", 2195)
+			end
+			@ssl = OpenSSL::SSL::SSLSocket.new(@sock, ctx)
+			@ssl.connect
+		end
+		
+		def close_ssl
 			unless @ssl.nil?
 				@ssl.close
 			end
 			unless @sock.nil?
 				@sock.close
 			end
-
-			@messages = [] ## reset
-			return [failed_messages, []]
-		end
-
-		private
-		def setup_ssl
-			ctx = OpenSSL::SSL::SSLContext.new
-
-			ctx.key = OpenSSL::PKey::RSA.new(@certificate_data, '')
-			ctx.cert = OpenSSL::X509::Certificate.new(@certificate_data)
-
-			@sock = TCPSocket.new(@sandbox_environment ? "gateway.sandbox.push.apple.com" : "gateway.push.apple.com", 2195)
-			@ssl = OpenSSL::SSL::SSLSocket.new(@sock, ctx)
-			@ssl.connect
 		end
 
 		def reset_message(error_identifier)
@@ -150,7 +191,7 @@ module Push0r
 
 			@ssl.write(pushdata)
 
-			if IO.select([@ssl], nil, nil, 2)
+			if IO.select([@ssl], nil, nil, 0.5)
 				begin
 					read_buffer = @ssl.read(6)
 				rescue Exception
