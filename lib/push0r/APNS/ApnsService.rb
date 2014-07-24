@@ -117,12 +117,21 @@ module Push0r
 		end
 
 		def close_ssl
-			unless @ssl.nil?
-				@ssl.close
+			if !@ssl.nil? && !@ssl.closed?
+				begin
+					@ssl.close
+				rescue IOError
+				end
 			end
-			unless @sock.nil?
-				@sock.close
+			@ssl = nil
+			
+			if !@sock.nil? && !@sock.closed?
+				begin
+					@sock.close
+				rescue IOError
+				end
 			end
+			@sock = nil
 		end
 
 		def reset_message(error_identifier)
