@@ -1,6 +1,6 @@
 Gem::Specification.new do |s|
 	s.name        	= 'Push0r'
-	s.version     	= '0.4.2'
+	s.version     	= '0.4.3'
 	s.date        	= '2014-07-24'
 	s.summary     	= "Push0r gem"
 	s.description 	= "Library to push messages using APNS and GCM"

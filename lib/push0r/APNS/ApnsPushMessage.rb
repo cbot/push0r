@@ -26,7 +26,7 @@ module Push0r
 				new_payload[:aps][:sound] = sound
 			end
 			if badge
-				new_payload[:aps][:badge] = bade
+				new_payload[:aps][:badge] = badge
 			end		
 			@payload.merge!(new_payload)
 			
