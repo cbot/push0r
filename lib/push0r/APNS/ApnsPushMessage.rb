@@ -17,7 +17,8 @@ module Push0r
 		# @param alert_text [String] the alert text to be displayed
 		# @param sound [String] the sound to be played
 		# @param badge [Fixnum] the badge value to be displayed
-		def simple(alert_text = nil, sound = nil, badge = nil)
+    # @param category [String] the category this message belongs to (see UIUserNotificationCategory in apple's documentation)
+		def simple(alert_text = nil, sound = nil, badge = nil, category = nil)
 			new_payload = {aps: {}}
 			if alert_text
 				new_payload[:aps][:alert] = alert_text
@@ -27,7 +28,10 @@ module Push0r
 			end
 			if badge
 				new_payload[:aps][:badge] = badge
-			end		
+			end
+      if category
+        new_payload[:aps][:category] = category
+      end
 			@payload.merge!(new_payload)
 			
 			return self
