@@ -13,21 +13,26 @@ module Push0r
     SHUTDOWN = 10
     NONE = 255
   end
-
+  
+  module ApnsEnvironment
+    PRODUCTION = 0
+    SANDBOX = 1
+  end
+  
   # ApnsService is a {Service} implementation to push notifications to iOS and OSX users using the Apple Push Notification Service.
   # @example
   #   queue = Push0r::Queue.new
   #
-  #   apns_service = Push0r::ApnsService.new(File.read("aps.pem"), true)
+  #   apns_service = Push0r::ApnsService.new(File.read("aps.pem"), Push0r::ApnsEnvironment::SANDBOX)
   #   queue.register_service(apns_service)
   class ApnsService < Service
 
     # Returns a new ApnsService instance
     # @param certificate_data [String] the Apple push certificate in PEM format
-    # @param sandbox_environment [Boolean] true if the sandbox push server should be used, otherwise false
-    def initialize(certificate_data, sandbox_environment = false)
+    # @param environment [Fixnum] the environment to use when sending messages. Either ApnsEnvironment::PRODUCTION or ApnsEnvironment::SANDBOX. Defaults to ApnsEnvironment::PRODUCTION.
+    def initialize(certificate_data, environment = ApnsEnvironment::PRODUCTION)
       @certificate_data = certificate_data
-      @sandbox_environment = sandbox_environment
+      @environment = environment
       @ssl = nil
       @sock = nil
       @messages = []
@@ -35,7 +40,7 @@ module Push0r
 
     # @see Service#can_send?
     def can_send?(message)
-      return message.is_a?(ApnsPushMessage)
+      return message.is_a?(ApnsPushMessage) && message.environment == @environment
     end
 
     # @see Service#send
@@ -60,14 +65,12 @@ module Push0r
           break
         end
         (result, error_message, error_code) = transmit_messages
-        if result == false
+        unless result
           failed_messages << FailedMessage.new(error_code, [error_message.receiver_token], error_message)
           reset_message(error_message.identifier)
-          if @messages.empty? then
-            result = true
-          end
+          result = true if @messages.empty?
         end
-      end while result != true
+      end until result
 
       close_ssl
 
@@ -88,10 +91,10 @@ module Push0r
       end
 
       if IO.select([@ssl], nil, nil, 1)
-        while line = @ssl.read(38)
+        while (line = @ssl.read(38))
           f = line.unpack('N1n1H64')
           time = Time.at(f[0])
-          token = f[2].scan(/.{8}/).join(" ")
+          token = f[2].scan(/.{8}/).join(' ')
           tokens << token
         end
       end
@@ -109,10 +112,11 @@ module Push0r
       ctx.key = OpenSSL::PKey::RSA.new(@certificate_data, '')
       ctx.cert = OpenSSL::X509::Certificate.new(@certificate_data)
 
+      @sock = nil
       unless for_feedback
-        @sock = TCPSocket.new(@sandbox_environment ? 'gateway.sandbox.push.apple.com' : 'gateway.push.apple.com', 2195)
+        @sock = TCPSocket.new(@environment == ApnsEnvironment::SANDBOX ? 'gateway.sandbox.push.apple.com' : 'gateway.push.apple.com', 2195)
       else
-        @sock = TCPSocket.new(@sandbox_environment ? 'feedback.sandbox.push.apple.com' : 'feedback.push.apple.com', 2195)
+        @sock = TCPSocket.new(@environment == ApnsEnvironment::SANDBOX ? 'feedback.sandbox.push.apple.com' : 'feedback.push.apple.com', 2195)
       end
       @ssl = OpenSSL::SSL::SSLSocket.new(@sock, ctx)
       @ssl.connect
@@ -154,17 +158,12 @@ module Push0r
       identifier = message.identifier
       time_to_live = (message.time_to_live.nil? || message.time_to_live.to_i < 0) ? 0 : message.time_to_live.to_i
 
-      if receiver_token.nil? then
-        raise(ArgumentError, 'receiver_token is nil!')
-      end
-      if payload.nil? then
-        raise(ArgumentError, 'payload is nil!')
-      end
+      raise(ArgumentError, 'receiver_token is nil!') if receiver_token.nil?
 
-      receiver_token = receiver_token.gsub(/\s+/, "")
-      if receiver_token.length != 64 then
-        raise(ArgumentError, 'invalid receiver_token length!')
-      end
+      raise(ArgumentError, 'payload is nil!') if payload.nil?
+
+      receiver_token = receiver_token.gsub(/\s+/, '')
+      raise(ArgumentError, 'invalid receiver_token length!') if receiver_token.length != 64
 
       devicetoken = [receiver_token].pack('H*')
       devicetoken_length = [32].pack('n')
@@ -201,7 +200,7 @@ module Push0r
         return [true, nil, nil]
       end
 
-      pushdata = ""
+      pushdata = ''
       @messages.each do |message|
         pushdata << create_push_frame(message)
       end
@@ -229,11 +228,7 @@ module Push0r
 
     def message_for_identifier(identifier)
       index = @messages.find_index { |o| o.identifier == identifier }
-      if index.nil?
-        return nil
-      else
-        return @messages[index]
-      end
+      index.nil? ? nil : @messages[index]
     end
   end
 end
