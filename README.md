@@ -7,7 +7,7 @@ push0r is a ruby library that makes it easy to send push notifications to iOS, O
 ## Installation
 Gemfile for Rails 3, Rails 4, Sinatra, and Merb:
 ``` ruby
-gem 'push0r', '~> 0.4.4'
+gem 'push0r', '~> 0.5.0'
 ```
 
 Manual installation:
@@ -25,16 +25,18 @@ queue = Push0r::Queue.new
 gcm_service = Push0r::GcmService.new("__gcm_api_token__")
 queue.register_service(gcm_service)
 
-# create the ApnsService to push to iOS and OSX devices and register it with our queue.
-apns_service = Push0r::ApnsService.new(File.read("aps.pem"), true)
-queue.register_service(apns_service)
+# create ApnsService instances to push to iOS and OSX devices and register them with our queue.
+apns_service_production = Push0r::ApnsService.new(File.read("aps_production.pem"), Push0r::ApnsEnvironment::PRODUCTION)
+apns_service_sandbox = Push0r::ApnsService.new(File.read("aps_development.pem"), Push0r::ApnsEnvironment::SANDBOX)
+queue.register_service(apns_service_production)
+queue.register_service(apns_service_sandbox)
 
 # create a GcmPushMessage and attach a dummy payload
 gcm_message = Push0r::GcmPushMessage.new("__registration_id__")
 gcm_message.attach({"data" => {"d" => "1"}})
 
-# create a ApnsPushMessage and attach a dummy payload
-apns_message = Push0r::ApnsPushMessage.new("__device_token__")
+# create a ApnsPushMessage to be sent via the Sandbox apns service and attach a dummy payload
+apns_message = Push0r::ApnsPushMessage.new("__device_token__", Push0r::ApnsEnvironment::SANDBOX)
 apns_message.attach({"data" => {"v" => "1"}}
 
 # add both messages to the queue
