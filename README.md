@@ -7,7 +7,7 @@ push0r is a ruby library that makes it easy to send push notifications to iOS, O
 ## Installation
 Gemfile for Rails 3, Rails 4, Sinatra, and Merb:
 ``` ruby
-gem 'push0r', '~> 0.5.0'
+gem 'push0r', '~> 0.5.1'
 ```
 
 Manual installation:

@@ -62,7 +62,14 @@ module Push0r
       @messages.each do |message|
         begin
           request = Net::HTTP::Post.new(uri.path, {'Content-Type' => 'application/json', 'Authorization' => "key=#{@api_key}"})
-          request.body = message.attach({'registration_ids' => message.receiver_token}).payload.to_json
+
+          if message.receiver_token.count == 1
+            receivers = {'to' => message.receiver_token.first}
+          else
+            receivers = {'registration_ids' => message.receiver_token}
+          end
+
+          request.body = message.attach(receivers).payload.to_json
           response = http.request(request)
         rescue SocketError
           ## connection error
