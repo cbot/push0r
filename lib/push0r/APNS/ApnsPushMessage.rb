@@ -36,9 +36,9 @@ module Push0r
         new_payload[:aps][:category] = category
       end
 
-      @payload.merge!(new_payload)
+      payload.merge!(new_payload)
 
-      return self
+      self
     end
   end
 end

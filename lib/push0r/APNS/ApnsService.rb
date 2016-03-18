@@ -1,3 +1,4 @@
+require 'http/2'
 module Push0r
 
   # A module that contains Apple Push Notification Service error codes
@@ -55,57 +56,17 @@ module Push0r
 
     # @see Service#end_push
     def end_push
-      failed_messages = []
-      result = false
       begin
-        begin
-          setup_ssl(true)
-        rescue SocketError => e
-          puts "Error: #{e}"
-          break
-        end
-        (result, error_message, error_code) = transmit_messages
-        unless result
-          failed_messages << FailedMessage.new(error_code, [error_message.receiver_token], error_message)
-          reset_message(error_message.identifier)
-          result = true if @messages.empty?
-        end
-      end until result
-
-      close_ssl
-
-      @messages = [] ## reset
-      return [failed_messages, []]
-    end
-
-    # Calls the APNS feedback service and returns an array of expired push tokens
-    # @return [Array<String>] an array of expired push tokens
-    def get_feedback
-      tokens = []
-
-      begin
-        setup_ssl(true)
+        failed_messages = transmit_messages(topic: 'net.wissenswerft.vwpushtest')
+        return [[], []]
       rescue SocketError => e
         puts "Error: #{e}"
-        return tokens
+        return [[], []]
       end
-
-      if IO.select([@ssl], nil, nil, 1)
-        while (line = @ssl.read(38))
-          f = line.unpack('N1n1H64')
-          time = Time.at(f[0])
-          token = f[2].scan(/.{8}/).join(' ')
-          tokens << token
-        end
-      end
-
-      close_ssl
-
-      return tokens
     end
 
     private
-    def setup_ssl(for_feedback = false)
+    def setup_ssl
       close_ssl
       ctx = OpenSSL::SSL::SSLContext.new
 
@@ -113,12 +74,9 @@ module Push0r
       ctx.cert = OpenSSL::X509::Certificate.new(@certificate_data)
 
       @sock = nil
-      unless for_feedback
-        @sock = TCPSocket.new(@environment == ApnsEnvironment::SANDBOX ? 'gateway.sandbox.push.apple.com' : 'gateway.push.apple.com', 2195)
-      else
-        @sock = TCPSocket.new(@environment == ApnsEnvironment::SANDBOX ? 'feedback.sandbox.push.apple.com' : 'feedback.push.apple.com', 2195)
-      end
+      @sock = TCPSocket.new(@environment == ApnsEnvironment::SANDBOX ? 'api.development.push.apple.com' : 'api.push.apple.com', 443)
       @ssl = OpenSSL::SSL::SSLSocket.new(@sock, ctx)
+      @ssl.sync_close = true
       @ssl.connect
     end
 
@@ -129,26 +87,12 @@ module Push0r
         rescue IOError
         end
       end
-      @ssl = nil
 
       if !@sock.nil? && !@sock.closed?
         begin
           @sock.close
         rescue IOError
         end
-      end
-      @sock = nil
-    end
-
-    def reset_message(error_identifier)
-      index = @messages.find_index { |o| o.identifier == error_identifier }
-
-      if index.nil? ## this should never happen actually
-        @messages = []
-      elsif index < @messages.length - 1 # reset @messages to contain all messages after the one that has failed
-        @messages = @messages[index+1, @messages.length]
-      else ## the very last message failed, so there's nothing left to be sent
-        @messages = []
       end
     end
 
@@ -192,43 +136,62 @@ module Push0r
       frame_length = [devicetoken_item.bytesize + payload_item.bytesize + identifier_item.bytesize + expiration_item.bytesize + priority_item.bytesize].pack('N')
       frame = "\2#{frame_length}#{devicetoken_item}#{payload_item}#{identifier_item}#{expiration_item}#{priority_item}"
 
-      return frame
+      frame
     end
 
-    def transmit_messages
-      if @messages.empty? || @ssl.nil?
-        return [true, nil, nil]
+    def transmit_messages(topic:)
+      if @messages.empty?
+        return []
       end
 
-      pushdata = ''
+      setup_ssl
+
+      conn = HTTP2::Client.new
+
+      conn.on(:frame) do |bytes|
+        @ssl.print bytes
+        @ssl.flush
+      end
+
       @messages.each do |message|
-        pushdata << create_push_frame(message)
+        stream = conn.new_stream
+
+        stream.on(:close) do
+          @ssl.close if conn.active_stream_count == 0
+        end
+
+        stream.on(:headers) do |h|
+          puts "response headers: #{h}"
+        end
+
+        stream.on(:data) do |d|
+          puts "response data chunk: <<#{d}>>"
+        end
+
+        json = message.payload.to_json
+
+        headers = {
+            ':method' => 'POST',
+            ':path' => "/3/device/#{message.receiver_token}",
+            'content-length' => "#{json.length}",
+            'apns-topic' => topic
+        }
+        stream.headers(headers, end_stream: false)
+        stream.data(json)
       end
 
-      @ssl.write(pushdata)
-
-      if IO.select([@ssl], nil, nil, 1)
+      while !@ssl.closed? && !@ssl.eof?
+        data = @ssl.read_nonblock(1024)
         begin
-          read_buffer = @ssl.read(6)
-        rescue Exception
-          return [true, nil, nil]
-        end
-        if !read_buffer.nil?
-          #cmd = read_buffer[0].unpack("C").first
-          error_code = read_buffer[1].unpack('C').first
-          identifier = read_buffer[2, 4].unpack('N').first
-          puts "ERROR: APNS returned error code #{error_code} #{identifier}"
-          return [false, message_for_identifier(identifier), error_code]
-        else
-          return [true, nil, nil]
+          conn << data
+        rescue => e
+          puts "#{e.class} exception: #{e.message} - closing socket."
         end
       end
-      return [true, nil, nil]
-    end
 
-    def message_for_identifier(identifier)
-      index = @messages.find_index { |o| o.identifier == identifier }
-      index.nil? ? nil : @messages[index]
+      @messages = []
+
+      return []
     end
   end
 end
