@@ -1,9 +1,7 @@
 *.gem
-*.pem
-*.p12
-test.rb
-.DS_Store
 
-/.yardoc/
-/doc/
+.DS_Store
+test
+.yardoc
+doc
 .idea

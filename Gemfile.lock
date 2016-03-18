@@ -1,7 +1,7 @@
 PATH
   remote: .
   specs:
-    Push0r (0.4.4)
+    Push0r (0.5.1)
 
 GEM
   remote: https://rubygems.org/
@@ -16,3 +16,6 @@ DEPENDENCIES
   Push0r!
   rake
   rspec (~> 0)
+
+BUNDLED WITH
+   1.11.2
