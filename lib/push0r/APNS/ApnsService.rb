@@ -1,4 +1,6 @@
 require 'http/2'
+require 'openssl'
+
 module Push0r
 
   # A module that contains Apple Push Notification Service error codes
@@ -14,12 +16,12 @@ module Push0r
     SHUTDOWN = 10
     NONE = 255
   end
-  
+
   module ApnsEnvironment
     PRODUCTION = 0
     SANDBOX = 1
   end
-  
+
   # ApnsService is a {Service} implementation to push notifications to iOS and OSX users using the Apple Push Notification Service.
   # @example
   #   queue = Push0r::Queue.new
@@ -31,12 +33,13 @@ module Push0r
     # Returns a new ApnsService instance
     # @param certificate_data [String] the Apple push certificate in PEM format
     # @param environment [Fixnum] the environment to use when sending messages. Either ApnsEnvironment::PRODUCTION or ApnsEnvironment::SANDBOX. Defaults to ApnsEnvironment::PRODUCTION.
-    def initialize(certificate_data, environment = ApnsEnvironment::PRODUCTION)
+    def initialize(certificate_data, environment = ApnsEnvironment::PRODUCTION, topic = nil)
       @certificate_data = certificate_data
       @environment = environment
       @ssl = nil
       @sock = nil
       @messages = []
+      @topic = topic
     end
 
     # @see Service#can_send?
@@ -51,13 +54,15 @@ module Push0r
 
     # @see Service#init_push
     def init_push
-      # not used for apns
+      if @topic.nil?
+        @topic = extract_first_topic_from_certificate
+      end
     end
 
     # @see Service#end_push
     def end_push
       begin
-        failed_messages = transmit_messages(topic: 'net.wissenswerft.vwpushtest')
+        failed_messages = transmit_messages
         return [[], []]
       rescue SocketError => e
         puts "Error: #{e}"
@@ -68,10 +73,15 @@ module Push0r
     private
     def setup_ssl
       close_ssl
-      ctx = OpenSSL::SSL::SSLContext.new
 
-      ctx.key = OpenSSL::PKey::RSA.new(@certificate_data, '')
-      ctx.cert = OpenSSL::X509::Certificate.new(@certificate_data)
+      begin
+        ctx = OpenSSL::SSL::SSLContext.new
+        ctx.key = OpenSSL::PKey::RSA.new(@certificate_data, '')
+        ctx.cert = OpenSSL::X509::Certificate.new(@certificate_data)
+      rescue StandardError => e
+        puts "OpenSSL error: #{e}"
+        return
+      end
 
       @sock = nil
       @sock = TCPSocket.new(@environment == ApnsEnvironment::SANDBOX ? 'api.development.push.apple.com' : 'api.push.apple.com', 443)
@@ -96,50 +106,7 @@ module Push0r
       end
     end
 
-    def create_push_frame(message)
-      receiver_token = message.receiver_token
-      payload = message.payload
-      identifier = message.identifier
-      time_to_live = (message.time_to_live.nil? || message.time_to_live.to_i < 0) ? 0 : message.time_to_live.to_i
-
-      raise(ArgumentError, 'receiver_token is nil!') if receiver_token.nil?
-
-      raise(ArgumentError, 'payload is nil!') if payload.nil?
-
-      receiver_token = receiver_token.gsub(/\s+/, '')
-      raise(ArgumentError, 'invalid receiver_token length!') if receiver_token.length != 64
-
-      devicetoken = [receiver_token].pack('H*')
-      devicetoken_length = [32].pack('n')
-      devicetoken_item = "\1#{devicetoken_length}#{devicetoken}"
-
-      identifier = [identifier.to_i].pack('N')
-      identifier_length = [4].pack('n')
-      identifier_item = "\3#{identifier_length}#{identifier}"
-
-      expiration_date = [(time_to_live > 0 ? Time.now.to_i + time_to_live : 0)].pack('N')
-      expiration_date_length = [4].pack('n')
-      expiration_item = "\4#{expiration_date_length}#{expiration_date}"
-
-      priority = "\xA" ## default: high priority
-      if payload[:aps] && payload[:aps]['content-available'] && payload[:aps]['content-available'].to_i != 0 && (payload[:aps][:alert].nil? && payload[:aps][:sound].nil? && payload[:aps][:badge].nil?)
-        priority = "\5" ## lower priority for content-available pushes without alert/sound/badge
-      end
-
-      priority_length = [1].pack('n')
-      priority_item = "\5#{priority_length}#{priority}"
-
-      payload = payload.to_json.force_encoding('BINARY')
-      payload_length = [payload.bytesize].pack('n')
-      payload_item = "\2#{payload_length}#{payload}"
-
-      frame_length = [devicetoken_item.bytesize + payload_item.bytesize + identifier_item.bytesize + expiration_item.bytesize + priority_item.bytesize].pack('N')
-      frame = "\2#{frame_length}#{devicetoken_item}#{payload_item}#{identifier_item}#{expiration_item}#{priority_item}"
-
-      frame
-    end
-
-    def transmit_messages(topic:)
+    def transmit_messages
       if @messages.empty?
         return []
       end
@@ -154,6 +121,9 @@ module Push0r
       end
 
       @messages.each do |message|
+        raise(ArgumentError, 'receiver_token is nil!') if message.receiver_token.nil?
+        raise(ArgumentError, 'payload is nil!') if message.payload.nil?
+
         stream = conn.new_stream
 
         stream.on(:close) do
@@ -168,14 +138,23 @@ module Push0r
           puts "response data chunk: <<#{d}>>"
         end
 
-        json = message.payload.to_json
+        payload = message.payload
+        json = payload.to_json
+        priority = '10' # default high priority
+        if payload[:aps] && payload[:aps]['content-available'] && payload[:aps]['content-available'].to_i != 0 && (payload[:aps][:alert].nil? && payload[:aps][:sound].nil? && payload[:aps][:badge].nil?)
+          priority = '5' ## lower priority for content-available pushes without alert/sound/badge
+        end
 
         headers = {
             ':method' => 'POST',
             ':path' => "/3/device/#{message.receiver_token}",
             'content-length' => "#{json.length}",
-            'apns-topic' => topic
+            'apns-expiration' => "#{Time.now.to_i + (message.time_to_live || 1209600)}",
+            'apns-priority' => priority,
+            'apns-id' => message.identifier
         }
+        headers['apns-topic'] = @topic unless @topic.nil?
+
         stream.headers(headers, end_stream: false)
         stream.data(json)
       end
@@ -193,5 +172,52 @@ module Push0r
 
       return []
     end
+
+    def extract_first_topic_from_certificate
+      if @certificate_data.nil?
+        puts 'Unable to extract topic from certificate - certificate missing'
+        return
+      end
+
+      begin
+        cert = OpenSSL::X509::Certificate.new(@certificate_data)
+      rescue StandardError => e
+        puts "OpenSSL error: #{e}"
+        return
+      end
+
+      extension = cert.extensions.select { |e| e.oid == '1.2.840.113635.100.6.3.6' }.first
+      if extension.nil?
+        puts 'Unable to extract topic from certificate - missing certificate extension'
+        return
+      end
+
+      topic = nil
+      begin
+        extension_node = OpenSSL::ASN1.decode(extension)
+        if extension_node.is_a?(OpenSSL::ASN1::Sequence)
+          extension_node.each do |subnode|
+            if subnode.is_a?(OpenSSL::ASN1::OctetString)
+              sequence_node = OpenSSL::ASN1.decode(subnode.value)
+              if sequence_node.is_a?(OpenSSL::ASN1::Sequence)
+                sequence_node.each do |data_node|
+                  if data_node.value.is_a?(String)
+                    topic = data_node.value
+                    break
+                  end
+                end
+              end
+            end
+          end
+        end
+      rescue StandardError => e
+        puts "OpenSSL Error: #{e}"
+      end
+
+      puts 'Unable to extract topic from certificate - could not parse data' if topic.nil?
+
+      topic
+    end
+
   end
 end

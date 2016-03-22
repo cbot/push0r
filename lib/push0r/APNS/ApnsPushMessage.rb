@@ -1,3 +1,5 @@
+require 'SecureRandom'
+
 module Push0r
   # ApnsPushMessage is a {PushMessage} implementation that encapsulates a single push notification to be sent to a single user.
   class ApnsPushMessage < PushMessage
@@ -7,10 +9,10 @@ module Push0r
     # @param receiver_token [String] the apns push token (aka device token) to push the notification to
     # @param environment [Fixnum] the environment to use when sending this push message. Defaults to ApnsEnvironment::PRODUCTION.
     # @param identifier [Fixnum] a unique identifier to identify this push message during error handling. If nil, a random identifier is automatically generated.
-    # @param time_to_live [Fixnum] The time to live in seconds for this push messages. If nil, the time to live is set to zero seconds.
+    # @param time_to_live [Fixnum] The time to live in seconds for this push messages. If nil, the time to live is set to two weeks.
     def initialize(receiver_token, environment = ApnsEnvironment::PRODUCTION, identifier = nil, time_to_live = nil)
-      if identifier.nil? ## make sure the message has an identifier (required for apns error handling)
-        identifier = Random.rand(2**32)
+      if identifier.nil? ## make sure the message has an identifier
+        identifier = SecureRandom.uuid
       end
       super(receiver_token, identifier, time_to_live)
       @environment = environment
