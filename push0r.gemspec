@@ -6,10 +6,10 @@ Gem::Specification.new do |s|
   s.description = 'Library to push messages using APNS and GCM'
   s.authors     = ['Kai Straßmann']
   s.email       = 'derkai@gmail.com'
-  s.files       = %w(lib/push0r.rb lib/push0r/FlushResult.rb lib/push0r/Queue.rb lib/push0r/PushMessage.rb lib/push0r/Service.rb lib/push0r/APNS/ApnsService.rb lib/push0r/APNS/ApnsPushMessage.rb lib/push0r/GCM/GcmService.rb lib/push0r/GCM/GcmPushMessage.rb)
+  s.files       = %w(lib/push0r.rb lib/push0r/FlushResult.rb lib/push0r/Queue.rb lib/push0r/PushMessage.rb lib/push0r/Service.rb lib/push0r/APNS/ApnsService.rb lib/push0r/APNS/ApnsServiceUtils.rb lib/push0r/APNS/ApnsPushMessage.rb lib/push0r/GCM/GcmService.rb lib/push0r/GCM/GcmPushMessage.rb)
   s.homepage    = 'https://github.com/cbot/push0r'
   s.license     = 'MIT'
 
   s.add_development_dependency 'rspec', '~> 0'
-  s.add_runtime_dependency 'http-2', '~> 0.8.0'
+  s.add_runtime_dependency 'net-http2', '~> 0.11.1'
 end

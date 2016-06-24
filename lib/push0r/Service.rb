@@ -37,7 +37,7 @@ module Push0r
     end
 
     # Called on the service during the flushing of a Queue after the last PushMessage has been sent. If the service manages its own internal queue, this is the place to actually transmit all messages.
-    # @return [Array(Array<String>, Array<String>)] Failed new RegId Messages
+    # @return [Array(Array<FailedMessage>, Array<NewTokenMessage>)] Failed new RegId Messages
     # @abstract
     # @see PushMessage
     # @see Queue

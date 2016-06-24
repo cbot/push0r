@@ -1,20 +1,36 @@
-require 'http/2'
+require 'net-http2'
 require 'openssl'
+require 'json'
 require_relative 'ApnsServiceUtils'
 
 module Push0r
   # A module that contains Apple Push Notification Service error codes
   module ApnsErrorCodes
-    PROCESSING_ERROR = 1
-    MISSING_DEVICE_TOKEN = 2
-    MISSING_TOPIC = 3
-    MISSING_PAYLOAD = 4
-    INVALID_TOKEN_SIZE = 5
-    INVALID_TOPIC_SIZE = 6
-    INVALID_PAYLOAD_SIZE = 7
-    INVALID_TOKEN = 8
-    SHUTDOWN = 10
-    NONE = 255
+    PAYLOAD_EMPTY = 0
+    PAYLOAD_TOO_LARGE = 1
+    BAD_TOPIC = 2
+    TOPIC_DISALLOWED = 3
+    BAD_MESSAGE_ID = 4
+    BAD_EXPIRATION_DATE = 5
+    BAD_PRIORITY = 6
+    MISSING_DEVICE_TOKEN = 7
+    BAD_DEVICE_TOKEN = 8
+    DEVICE_TOKEN_NOT_FOR_TOPIC = 9
+    UNREGISTERED = 10
+    DUPLICATE_HEADERS = 11
+    BAD_CERTIFICATE_ENVIRONMENT = 12
+    BAD_CERTIFICATE = 13
+    FORBIDDEN = 14
+    BAD_PATH = 15
+    METHOD_NOT_ALLOWED = 16
+    TOO_MANY_REQUESTS = 17
+    IDLE_TIMEOUT = 18
+    SHUTDOWN = 19
+    INTERNAL_SERVER_ERROR = 20
+    SERVICE_UNAVAILABLE = 21
+    MISSING_TOPIC = 22
+    SOCKET_ERROR = 99
+    OTHER = 100
   end
 
   module ApnsEnvironment
@@ -62,18 +78,9 @@ module Push0r
 
     # @see Service#end_push
     def end_push
-      begin
-        failed_messages = transmit_messages
-        return [[], []]
-      rescue SocketError => e
-        puts "Error: #{e}"
+      if @messages.empty?
         return [[], []]
       end
-    end
-
-    private
-    def setup_ssl
-      close_ssl
 
       begin
         ctx = OpenSSL::SSL::SSLContext.new
@@ -81,64 +88,15 @@ module Push0r
         ctx.cert = OpenSSL::X509::Certificate.new(@certificate_data)
       rescue StandardError => e
         puts "OpenSSL error: #{e}"
-        return
+        @messages = []
+        return [[], []]
       end
 
-      @sock = nil
-      @sock = TCPSocket.new(@environment == ApnsEnvironment::SANDBOX ? 'api.development.push.apple.com' : 'api.push.apple.com', 443)
-      @ssl = OpenSSL::SSL::SSLSocket.new(@sock, ctx)
-      @ssl.sync_close = true
-      @ssl.connect
-    end
+      host = @environment == ApnsEnvironment::SANDBOX ? 'api.development.push.apple.com' : 'api.push.apple.com'
+      client = NetHttp2::Client.new("https://#{host}", ssl_context: ctx)
+      failed_messages = []
 
-    def close_ssl
-      if !@ssl.nil? && !@ssl.closed?
-        begin
-          @ssl.close
-        rescue IOError
-        end
-      end
-
-      if !@sock.nil? && !@sock.closed?
-        begin
-          @sock.close
-        rescue IOError
-        end
-      end
-    end
-
-    def transmit_messages
-      if @messages.empty?
-        return []
-      end
-
-      setup_ssl
-
-      conn = HTTP2::Client.new
-
-      conn.on(:frame) do |bytes|
-        @ssl.print bytes
-        @ssl.flush
-      end
-
-      @messages.each do |message|
-        raise(ArgumentError, 'receiver_token is nil!') if message.receiver_token.nil?
-        raise(ArgumentError, 'payload is nil!') if message.payload.nil?
-
-        stream = conn.new_stream
-
-        stream.on(:close) do
-          @ssl.close if conn.active_stream_count == 0
-        end
-
-        stream.on(:headers) do |h|
-          puts "response headers: #{h}"
-        end
-
-        stream.on(:data) do |d|
-          puts "response data chunk: <<#{d}>>"
-        end
-
+      @messages.dup.each do |message|
         payload = message.payload
         json = payload.to_json
         priority = '10' # default high priority
@@ -147,31 +105,37 @@ module Push0r
         end
 
         headers = {
-            ':method' => 'POST',
-            ':path' => "/3/device/#{message.receiver_token}",
-            'content-length' => "#{json.length}",
-            'apns-expiration' => "#{Time.now.to_i + (message.time_to_live || 1209600)}",
-            'apns-priority' => priority,
-            'apns-id' => message.identifier
+          'apns-expiration' => "#{Time.now.to_i + (message.time_to_live || 1209600)}",
+          'apns-priority' => priority,
+          'apns-id' => message.identifier
         }
         headers['apns-topic'] = @topic unless @topic.nil?
 
-        stream.headers(headers, end_stream: false)
-        stream.data(json)
-      end
-
-      while !@ssl.closed? && !@ssl.eof?
-        data = @ssl.read_nonblock(1024)
         begin
-          conn << data
-        rescue => e
-          puts "#{e.class} exception: #{e.message} - closing socket."
+          response = client.call(:post, "/3/device/#{message.receiver_token}", headers: headers, body: json)
+        rescue SocketError => e
+          failed_messages << FailedMessage.new(Push0r::ApnsErrorCodes::SOCKET_ERROR, Array(message.receiver_token), message)
+          puts e
+          next
         end
+
+        if response.status.to_i != 200 && !response.body.empty?
+          begin
+            resp = JSON.parse(response.body)
+            error_code = error_code_for_reason(resp['reason'])
+            failed_messages << FailedMessage.new(error_code, Array(message.receiver_token), message)
+          rescue StandardError => e
+            puts e
+          end
+        end
+
+        @messages.delete(message)
       end
 
-      @messages = []
+      # close the connection
+      client.close
 
-      return []
+      return [failed_messages, []]
     end
   end
 end
