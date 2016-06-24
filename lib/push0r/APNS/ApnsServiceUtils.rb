@@ -49,7 +49,6 @@ module Push0r
       topic
     end
 
-
     # @param [String] reason the reason string that is returned from APNS
     # @return [Fixnum] the error code (from Push0r::ApnsErrorCodes) for the reason
     def error_code_for_reason(reason)

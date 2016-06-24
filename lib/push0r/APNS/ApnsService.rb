@@ -110,6 +110,7 @@ module Push0r
           'apns-id' => message.identifier
         }
         headers['apns-topic'] = @topic unless @topic.nil?
+        headers['apns-collapse-id'] = message.collapse_key unless message.collapse_key.nil?
 
         begin
           response = client.call(:post, "/3/device/#{message.receiver_token}", headers: headers, body: json)
