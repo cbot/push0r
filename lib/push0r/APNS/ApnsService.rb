@@ -1,8 +1,8 @@
 require 'http/2'
 require 'openssl'
+require_relative 'ApnsServiceUtils'
 
 module Push0r
-
   # A module that contains Apple Push Notification Service error codes
   module ApnsErrorCodes
     PROCESSING_ERROR = 1
@@ -29,6 +29,7 @@ module Push0r
   #   apns_service = Push0r::ApnsService.new(File.read("aps.pem"), Push0r::ApnsEnvironment::SANDBOX)
   #   queue.register_service(apns_service)
   class ApnsService < Service
+    include Push0r::ApnsServiceUtils
 
     # Returns a new ApnsService instance
     # @param certificate_data [String] the Apple push certificate in PEM format
@@ -55,7 +56,7 @@ module Push0r
     # @see Service#init_push
     def init_push
       if @topic.nil?
-        @topic = extract_first_topic_from_certificate
+        @topic = extract_first_topic_from_certificate(@certificate_data)
       end
     end
 
@@ -172,52 +173,5 @@ module Push0r
 
       return []
     end
-
-    def extract_first_topic_from_certificate
-      if @certificate_data.nil?
-        puts 'Unable to extract topic from certificate - certificate missing'
-        return
-      end
-
-      begin
-        cert = OpenSSL::X509::Certificate.new(@certificate_data)
-      rescue StandardError => e
-        puts "OpenSSL error: #{e}"
-        return
-      end
-
-      extension = cert.extensions.select { |e| e.oid == '1.2.840.113635.100.6.3.6' }.first
-      if extension.nil?
-        puts 'Unable to extract topic from certificate - missing certificate extension'
-        return
-      end
-
-      topic = nil
-      begin
-        extension_node = OpenSSL::ASN1.decode(extension)
-        if extension_node.is_a?(OpenSSL::ASN1::Sequence)
-          extension_node.each do |subnode|
-            if subnode.is_a?(OpenSSL::ASN1::OctetString)
-              sequence_node = OpenSSL::ASN1.decode(subnode.value)
-              if sequence_node.is_a?(OpenSSL::ASN1::Sequence)
-                sequence_node.each do |data_node|
-                  if data_node.value.is_a?(String)
-                    topic = data_node.value
-                    break
-                  end
-                end
-              end
-            end
-          end
-        end
-      rescue StandardError => e
-        puts "OpenSSL Error: #{e}"
-      end
-
-      puts 'Unable to extract topic from certificate - could not parse data' if topic.nil?
-
-      topic
-    end
-
   end
 end
