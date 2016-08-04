@@ -52,7 +52,7 @@ module Push0r
 
         @messages.each do |message|
           if message.time_to_live && message.time_to_live.to_i >= 0
-            message.attach({'time_to_live' => time_to_live.to_i})
+            message.attach({time_to_live: time_to_live.to_i})
           end
 
           begin
@@ -61,13 +61,13 @@ module Push0r
             payload = {data: message.payload}
 
             if message.receiver_tokens.count == 1
-              payload.merge!({'to' => message.receiver_tokens.first})
+              payload.merge!({to: message.receiver_tokens.first})
             else
-              payload.merge!({'registration_ids' => message.receiver_tokens})
+              payload.merge!({registration_ids: message.receiver_tokens})
             end
 
             if message.collapse_key && !message.collapse_key.empty?
-              payload.merge!({'collapse_key' => message.collapse_key})
+              payload.merge!({collapse_key: message.collapse_key})
             end
 
             request.body = payload.to_json
