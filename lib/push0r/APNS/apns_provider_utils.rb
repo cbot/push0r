@@ -6,14 +6,14 @@ module Push0r
       def extract_first_topic_from_certificate(certificate_data)
         if certificate_data.nil?
           puts 'Unable to extract topic from certificate - certificate missing'
-          return
+          return nil
         end
 
         begin
           cert = OpenSSL::X509::Certificate.new(certificate_data)
         rescue StandardError => e
           puts "OpenSSL error: #{e}"
-          return
+          return nil
         end
 
         extension = cert.extensions.select { |e| e.oid == '1.2.840.113635.100.6.3.6' }.first

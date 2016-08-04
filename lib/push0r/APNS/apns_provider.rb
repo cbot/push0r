@@ -89,11 +89,16 @@ module Push0r
         @messages.dup.each do |message|
           payload = message.payload
           json = payload.to_json
+
+          # determine priority
           priority = '10' # default high priority
-          if payload[:aps] && payload[:aps]['content-available'] && payload[:aps]['content-available'].to_i != 0 && (payload[:aps][:alert].nil? && payload[:aps][:sound].nil? && payload[:aps][:badge].nil?)
+          content_available_set = (payload.dig(:aps, :'content-available')&.to_i || 0) != 0
+          aps_content_set = !Hash(payload[:aps]).select { |k,v| k != :'content-available' }.empty?
+          if content_available_set && !aps_content_set
             priority = '5' ## lower priority for content-available pushes without alert/sound/badge
           end
 
+          # headers
           headers = {
             'apns-expiration' => "#{Time.now.to_i + (message.time_to_live || 1209600)}",
             'apns-priority' => priority,

@@ -1,1 +1,0 @@
-require 'push0r'

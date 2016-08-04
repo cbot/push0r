@@ -1,7 +1,8 @@
 *.gem
 
 .DS_Store
-test
+test*
 .yardoc
 doc
 .idea
+*.pem

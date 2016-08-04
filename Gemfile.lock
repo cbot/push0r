@@ -2,16 +2,15 @@ PATH
   remote: .
   specs:
     Push0r (0.6.0)
-      net-http2 (~> 0.11.1)
+      net-http2 (~> 0.12.1)
 
 GEM
   remote: https://rubygems.org/
   specs:
     http-2 (0.8.2)
-    net-http2 (0.11.1)
+    net-http2 (0.12.1)
       http-2 (~> 0.8.2)
     rake (10.4.2)
-    rspec (0.9.4)
 
 PLATFORMS
   ruby
@@ -19,7 +18,6 @@ PLATFORMS
 DEPENDENCIES
   Push0r!
   rake
-  rspec (~> 0)
 
 BUNDLED WITH
    1.11.2

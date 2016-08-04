@@ -9,7 +9,7 @@ module Push0r
       ## empty
     end
 
-    # Called on the provider during before the first Message is sent.
+    # Called on the provider before the first Message is sent.
     # @return [void]
     # @abstract
     # @see Message
