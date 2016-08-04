@@ -1,7 +1,7 @@
 PATH
   remote: .
   specs:
-    Push0r (0.6.0)
+    Push0r (0.6.0.beta.1)
       net-http2 (~> 0.12.1)
 
 GEM

@@ -7,7 +7,7 @@ push0r is a ruby library that makes it easy to send push notifications to iOS, O
 ## Installation
 Gemfile for Rails 3, Rails 4, Sinatra, and Merb:
 ``` ruby
-gem 'Push0r', '~> 0.5.1'
+gem 'Push0r', '~> 0.6.0'
 ```
 
 Manual installation:
@@ -18,33 +18,26 @@ gem install Push0r
 
 ## Usage
 ``` ruby
-# create a new queue
-queue = Push0r::Queue.new
+include Push0r
 
-# create the GcmService to push to Android devices and register it with our queue.
-gcm_service = Push0r::GcmService.new("__gcm_api_token__")
-queue.register_service(gcm_service)
+# create a new Push0r instance
+pusher = Push0r::Base.new
 
-# create ApnsService instances to push to iOS and OSX devices and register them with our queue.
-apns_service_production = Push0r::ApnsService.new(File.read("aps_production.pem"), Push0r::ApnsEnvironment::PRODUCTION)
-apns_service_sandbox = Push0r::ApnsService.new(File.read("aps_development.pem"), Push0r::ApnsEnvironment::SANDBOX)
-queue.register_service(apns_service_production)
-queue.register_service(apns_service_sandbox)
+# add a GCM service provider to push to Android devices
+pusher.add_provider(GCM::GCMProvider.new('__gcm_api_token__'), as: :gcm)
 
-# create a GcmPushMessage and attach a dummy payload
-gcm_message = Push0r::GcmPushMessage.new("__registration_id__")
-gcm_message.attach({"data" => {"d" => "1"}})
+# add a APNS service provider to push to iOS and macOS devices.
+pusher.add_provider(APNS::APNSProvider.new(File.read('aps.pem'), APNS::Environment::SANDBOX), as: :apns_sandbox)
+pusher.add_provider(APNS::APNSProvider.new(File.read('aps.pem'), APNS::Environment::PRODUCTION), as: :apns_production)
 
-# create a ApnsPushMessage to be sent via the Sandbox apns service and attach a dummy payload
-apns_message = Push0r::ApnsPushMessage.new("__device_token__", Push0r::ApnsEnvironment::SANDBOX)
-apns_message.attach({"data" => {"v" => "1"}}
+# queue a gcm message and attach a dummy payload
+pusher.queue(Message.new(:gcm, '__registration_id__', collapse_key: 'test').attach({"data" => {"d" => "1"}}))
 
-# add both messages to the queue
-queue.add(gcm_message)
-queue.add(apns_message)
+# queue a apns message and attach a dummy payload
+pusher.queue(Message.new(:apns_sandbox, '__device_token__').attach({"data" => {"d" => "1"}}))
 
 # flush the queue to actually transmit the messages
-queue.flush
+pusher.flush
 ```
 
 ## Documentation
