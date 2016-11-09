@@ -5,6 +5,7 @@ require 'json'
 require_relative 'message'
 require_relative 'provider'
 require_relative 'flush_result'
+require_relative 'Exceptions/push_exception'
 require_relative 'GCM/gcm_provider'
 require_relative 'APNS/apns_provider'
 

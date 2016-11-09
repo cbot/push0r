@@ -8,30 +8,35 @@ module Push0r
   module APNS
     # A module that contains Apple Push Notification Service error codes
     module ErrorCodes
+      BAD_CERTIFICATE = 'ApnsBadCertificate'
+      BAD_CERTIFICATE_ENVIRONMENT = 'ApnsBadCertificateEnvironment'
+      BAD_COLLAPSE_ID = 'ApnsBadCollapseId'
+      BAD_DEVICE_TOKEN = 'ApnsBadDeviceToken'
+      BAD_EXPIRATION_DATE = 'ApnsBadExpirationDate'
+      BAD_MESSAGE_ID = 'ApnsBadMessageId'
+      BAD_PATH = 'ApnsBadPath'
+      BAD_PRIORITY = 'ApnsBadPriority'
+      BAD_TOPIC = 'ApnsBadTopic'
+      DEVICE_TOKEN_NOT_FOR_TOPIC = 'ApnsDeviceTokenNotForTopic'
+      DUPLICATE_HEADERS = 'ApnsDuplicateHeaders'
+      EXPIRED_PROVIDER_TOKEN = 'ApnsExpiredProviderToken'
+      FORBIDDEN = 'ApnsForbidden'
+      IDLE_TIMEOUT = 'ApnsIdleTimeout'
+      INTERNAL_SERVER_ERROR = 'ApnsInternalServerError'
+      INVALID_PROVIDER_TOKEN = 'ApnsInvalidProviderToken'
+      METHOD_NOT_ALLOWED = 'ApnsMethodNotAllowed'
+      MISSING_DEVICE_TOKEN = 'ApnsMissingDeviceToken'
+      MISSING_PROVIDER_TOKEN = 'ApnsMissingProviderToken'
+      MISSING_TOPIC = 'ApnsMissingTopic'
       PAYLOAD_EMPTY = 'ApnsPayloadEmpty'
       PAYLOAD_TOO_LARGE = 'ApnsPayloadTooLarge'
-      BAD_TOPIC = 'ApnsBadTopic'
-      TOPIC_DISALLOWED = 'ApnsTopicDisallowed'
-      BAD_MESSAGE_ID = 'ApnsBadMessageId'
-      BAD_EXPIRATION_DATE = 'ApnsBadExpirationDate'
-      BAD_PRIORITY = 'ApnsBadPriority'
-      MISSING_DEVICE_TOKEN = 'ApnsMissingDeviceToken'
-      BAD_DEVICE_TOKEN = 'ApnsBadDeviceToken'
-      DEVICE_TOKEN_NOT_FOR_TOPIC = 'ApnsDeviceTokenNotForTopic'
-      UNREGISTERED = 'ApnsUnregistered'
-      DUPLICATE_HEADERS = 'ApnsDuplicateHeaders'
-      BAD_CERTIFICATE_ENVIRONMENT = 'ApnsBadCertificateEnvironment'
-      BAD_CERTIFICATE = 'ApnsBadCertificate'
-      FORBIDDEN = 'ApnsForbidden'
-      BAD_PATH = 'ApnsBadPath'
-      METHOD_NOT_ALLOWED = 'ApnsMethodNotAllowed'
-      TOO_MANY_REQUESTS = 'ApnsTooManyRequests'
-      IDLE_TIMEOUT = 'ApnsIdleTimeout'
-      SHUTDOWN = 'ApnsShutdown'
-      INTERNAL_SERVER_ERROR = 'ApnsInternalServerError'
       SERVICE_UNAVAILABLE = 'ApnsUnavailable'
-      MISSING_TOPIC = 'ApnsMissingTopic'
+      SHUTDOWN = 'ApnsShutdown'
       SOCKET_ERROR = 'ApnsSocketError'
+      TOO_MANY_REQUESTS = 'ApnsTooManyRequests'
+      TOO_MANY_PROVIDER_TOKEN_UPDATES = 'ApnsTooManyProviderTokenUpdates'
+      TOPIC_DISALLOWED = 'ApnsTopicDisallowed'
+      UNREGISTERED = 'ApnsUnregistered'
       OTHER = 'ApnsOther'
     end
 
@@ -39,19 +44,54 @@ module Push0r
       PRODUCTION = 0
       SANDBOX = 1
     end
+    
+    module Mode
+      JWT = 0
+      CERTIFICATE = 1
+    end
 
     # APNSProvider is a {Provider} implementation to push notifications to iOS and OSX users using the Apple Push Notification Service.
     class APNSProvider < Provider
       include Push0r::APNS::ProviderUtils
 
-      # Returns a new APNSProvider instance
+      # Returns a new APNSProvider instance using either a client certificate in PEM format or a signing key an JWT tokens
       # @param certificate_data [String] the Apple push certificate in PEM format
       # @param environment [Fixnum] the environment to use when sending messages. Either Environment::PRODUCTION or Environment::SANDBOX. Defaults to Environment::PRODUCTION.
-      def initialize(certificate_data, environment = Environment::PRODUCTION, topic = nil)
-        @certificate_data = certificate_data
+      # @param @team_id [String] the apple developer team id
+      # @param @key_id [String] the signing key's id from the apple developer center
+      # @param @key_data [String] the signing key as downloaded from the apple developer center
+      # @param @topic [String] the topic (bundle id) to target
+      def initialize(environment:, topic: nil, certificate_data: nil, team_id: nil, key_id: nil, key_data: nil)
+        if ![Environment::PRODUCTION, Environment::SANDBOX].include?(environment)
+          raise Push0r::Exceptions::PushException.new("invalid apns push environment: #{environment}")
+        end
         @environment = environment
+                
+        if team_id && key_id && key_data
+            raise Push0r::Exceptions::PushInitException.new("supply either a certificate or a team_id, a key_id and a key - not both") if !certificate_data.nil?
+            @team_id = team_id
+            @key_id = key_id
+            @key_data = key_data
+            @jwt = nil
+            @jwt_created_at = nil
+            @mode = Mode::JWT
+            @topic = topic
+        elsif certificate_data
+            raise Push0r::Exceptions::PushInitException.new("supply either a certificate or a team_id, a key_id and a key - not both") if team_id || key_id || key_data
+            @certificate_data = certificate_data
+            @mode = Mode::CERTIFICATE
+            if topic
+              @topic = topic
+            else
+              @topic = extract_first_topic_from_certificate(@certificate_data)
+            end
+        else
+          raise Push0r::Exceptions::PushInitException.new("Neither JWT nor certificate mode parameters given")
+        end
+
+        raise Push0r::Exceptions::PushInitException.new("Topic not set") if @topic.nil?
+        
         @messages = []
-        @topic = topic
       end
 
       # @see Service#send
@@ -61,9 +101,7 @@ module Push0r
 
       # @see Service#init_push
       def init_push
-        if @topic.nil?
-          @topic = extract_first_topic_from_certificate(@certificate_data)
-        end
+        # empty
       end
 
       # @see Service#end_push
@@ -71,15 +109,16 @@ module Push0r
         if @messages.empty?
           return [[], []]
         end
-
-        begin
-          ctx = OpenSSL::SSL::SSLContext.new
-          ctx.key = OpenSSL::PKey::RSA.new(@certificate_data, '')
-          ctx.cert = OpenSSL::X509::Certificate.new(@certificate_data)
-        rescue StandardError => e
-          puts "OpenSSL error: #{e}"
-          @messages = []
-          return [[], []]
+        
+        ctx = nil
+        if @certificate_data
+          begin
+            ctx = OpenSSL::SSL::SSLContext.new
+            ctx.key = OpenSSL::PKey::RSA.new(@certificate_data, '')
+            ctx.cert = OpenSSL::X509::Certificate.new(@certificate_data)
+          rescue StandardError => e
+            raise Push0r::Exceptions::PushInitException.new("OpenSSL error: #{e}")
+          end
         end
 
         host = @environment == Environment::SANDBOX ? 'api.development.push.apple.com' : 'api.push.apple.com'
@@ -104,6 +143,16 @@ module Push0r
             'apns-priority' => priority,
             'apns-id' => message.identifier || SecureRandom.uuid
           }
+          
+          if @mode == Mode::JWT
+            if @jwt.nil? || @jwt_created_at.nil? || Time.now - @jwt_created_at > 2700
+              @jwt = generate_jwt(@team_id, @key_id, @key_data)
+              @jwt_created_at = Time.now
+            end
+          
+            headers['authorization'] = "bearer #{@jwt}"
+          end
+          
           headers['apns-topic'] = @topic unless @topic.nil?
           headers['apns-collapse-id'] = message.collapse_key unless message.collapse_key.nil?
 
@@ -117,9 +166,10 @@ module Push0r
             next
           end
 
-          if response.status.to_i != 200 && !response.body.empty?
+          if response && response.status.to_i != 200 && !response.body.empty?
             begin
               resp = JSON.parse(response.body)
+              puts resp ####
               error_code = error_code_for_reason(resp['reason'])
               failed_messages << FailedMessage.new(error_code, Array(device_token), message, self)
             rescue StandardError => e
