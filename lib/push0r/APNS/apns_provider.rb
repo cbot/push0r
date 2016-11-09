@@ -169,7 +169,6 @@ module Push0r
           if response && response.status.to_i != 200 && !response.body.empty?
             begin
               resp = JSON.parse(response.body)
-              puts resp ####
               error_code = error_code_for_reason(resp['reason'])
               failed_messages << FailedMessage.new(error_code, Array(device_token), message, self)
             rescue StandardError => e
