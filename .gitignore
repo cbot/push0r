@@ -5,3 +5,7 @@ test
 .yardoc
 doc
 .idea
+*.pem
+*.der
+*.p12
+test.rb
