@@ -109,7 +109,7 @@ module Push0r
       close_ssl
       ctx = OpenSSL::SSL::SSLContext.new
 
-      ctx.key = OpenSSL::PKey::RSA.new(@certificate_data, '')
+      ctx.key = OpenSSL::PKey::RSA.new(@certificate_data)
       ctx.cert = OpenSSL::X509::Certificate.new(@certificate_data)
 
       @sock = nil
