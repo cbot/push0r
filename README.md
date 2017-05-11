@@ -31,25 +31,25 @@ instance.add_provider(provider_cert, as: :apns_cert)
 provider_jwt = APNS::APNSProvider.new(topic: '__bundleid__', team_id: '__teamid__', key_id: '__keyid__', key_data: File.read('__p8file__'))
 instance.add_provider(provider_jwt, as: :apns_jwt)
 
-# add a GCM service provider to push to Android devices
-provider_gcm = GCM::GCMProvider.new('__gcm_api_token__')
-instance.add_provider(provider_gcm, as: :gcm)
+# add a FCM service provider to push to Android devices
+provider_fcm = FCM::FCMProvider.new('__fcmserverkey__')
+instance.add_provider(provider_fcm, as: :fcm)
 
-# enqueu a Message to be sent to iOS/macOS using the auth key (JWT) based APNS provider
+# enqueue a Message to be sent to iOS/macOS using the auth key (JWT) based APNS provider
 jwt_message = Message.new(:apns_jwt, '__devicetoken__')
 jwt_message.alert(title: 'Hi there', body: 'Sent via jwt auth')
 instance.queue(jwt_message)
 
-# enqueu another Message to be sent to iOS/macOS using the certificate based APNS provider
+# enqueue another Message to be sent to iOS/macOS using the certificate based APNS provider
 # this message also sets the app's batch and plays a sound
 cert_message = Message.new(:apns_jwt, '__devicetoken__')
 cert_message.alert(title: 'Hi there', body: 'Sent via certificate auth').sound.batch(2)
 instance.queue(cert_message)
 
-# enqueu a gcm message and attach a dummy payload
-gcm_message = Message.new(:gcm, '__registration_id__', collapse_key: 'test')
-gcm_message.attach({data: {action: 'test'}})
-instance.queue(gcm_message)
+# enqueue a FCM message and attach a dummy payload
+fcm_message = Message.new(:fcm, '__registration_id__', collapse_key: 'test')
+fcm_message.attach({action: 'test'})
+instance.queue(fcm_message)
 
 
 # flush the queue to actually transmit the messages

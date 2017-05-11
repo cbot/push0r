@@ -1,8 +1,8 @@
 require 'net/http'
 
 module Push0r
-  module GCM
-    # A module that contains constants for Google Cloud Messaging error codes
+  module FCM
+    # A module that contains constants for Firebase Cloud Messaging error codes
     module ErrorCodes
       UNKNOWN_ERROR = 1
       INVALID_REGISTRATION = 2
@@ -20,15 +20,15 @@ module Push0r
       INTERNAL_ERROR = 500
     end
 
-    class GCMProvider < Provider
-      # @param api_key [String] the GCM API key obtained from the Google Developers Console
+    class FCMProvider < Provider
+      # @param api_key [String] the FCM server key obtained from the Firebase Console
       def initialize(api_key)
         @api_key = api_key
         @messages = []
       end
 
       def supports_multiple_recipients?
-        return true
+        true
       end
 
       # @see Service#send
@@ -38,7 +38,7 @@ module Push0r
 
       # @see Service#init_push
       def init_push
-        ## not used for gcm
+        ## not used for fcm
       end
 
       # @see Service#end_push
@@ -46,7 +46,7 @@ module Push0r
         failed_messages = []
         new_registration_messages = []
 
-        uri = URI.parse('https://android.googleapis.com/gcm/send')
+        uri = URI.parse('https://fcm.googleapis.com/fcm/send')
         http = Net::HTTP.new(uri.host, uri.port)
         http.use_ssl = true
 
@@ -58,7 +58,7 @@ module Push0r
           begin
             request = Net::HTTP::Post.new(uri.path, {'Content-Type' => 'application/json', 'Authorization' => "key=#{@api_key}"})
 
-            payload = {data: message.payload}
+            payload = {data: message.payload, notification: build_notification_hash(message)}
 
             if message.receiver_tokens.count == 1
               payload.merge!({to: message.receiver_tokens.first})
@@ -133,7 +133,22 @@ module Push0r
         end
 
         @messages = [] ## reset
-        return [failed_messages, new_registration_messages]
+        [failed_messages, new_registration_messages]
+      end
+
+      private
+      # @param [Push0r::Message] message
+      def build_notification_hash(message)
+        hash = {}
+        hash[:title] = message.alert_title unless message.alert_title.nil?
+        hash[:body] = message.alert_body unless message.alert_body.nil?
+        hash[:sound] = message.sound_name
+        hash[:color] = message.color_name unless message.color_name.nil?
+        hash[:icon] = message.icon_name unless message.icon_name.nil?
+        hash[:tag] = message.tag_name unless message.tag_name.nil?
+        hash[:click_action] = message.click_action_name unless message.click_action_name.nil?
+
+        hash
       end
     end
   end

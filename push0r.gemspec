@@ -3,7 +3,7 @@ Gem::Specification.new do |s|
   s.version     = '0.6.0.beta.1'
   s.date        = '2017-05-11'
   s.summary     = 'Push0r gem'
-  s.description = 'Library to push messages using APNS and GCM'
+  s.description = 'Library to push messages using APNS and FCM'
   s.authors     = ['Kai Straßmann']
   s.email       = 'derkai@gmail.com'
   s.files       = Dir.glob('{bin,lib}/**/*') + %w(LICENSE README.md)

@@ -65,7 +65,7 @@ module Push0r
       # @param @topic [String] the topic (bundle id) to target
       # @param @jwt_jar [Push0r::APNS::JWTJar] an optional custom object that handles JWT storage
       def initialize(environment:, topic: nil, certificate_data: nil, team_id: nil, key_id: nil, key_data: nil, jwt_jar: nil)
-        if ![Environment::PRODUCTION, Environment::SANDBOX].include?(environment)
+        unless [Environment::PRODUCTION, Environment::SANDBOX].include?(environment)
           raise Push0r::Exceptions::PushException.new("invalid apns push environment: #{environment}")
         end
         @environment = environment
@@ -75,7 +75,7 @@ module Push0r
             @team_id = team_id
             @key_id = key_id
             @key_data = key_data
-            @jwt_jar = jwt_jar || Push0r::APNS::JWTSimpleJar.new(Dir.tmpdir)
+            @jwt_jar = jwt_jar || Push0r::APNS::JWTJar.new
             @jwt_jar.load_data(key_id)
             @mode = Mode::JWT
             @topic = topic
@@ -193,6 +193,31 @@ module Push0r
         client.close
 
         return [failed_messages, []]
+      end
+
+      private
+      # @param [Push0r::Message] message
+      def build_payload(message)
+        hash = message.payload
+        if message.alert_title || message.alert_body || message.alert_subtitle
+          ensure_structure(hash, :aps, :alert)
+
+          hash[:aps][:alert][:body] = message.alert_body if message.alert_body
+          hash[:aps][:alert][:title] = message.alert_title if message.alert_title
+          hash[:aps][:alert][:subtitle] = message.alert_subtitle if message.alert_subtitle
+        end
+
+        if message.sound_name || message.badge_value || message.content_available_set || message.mutable_content_set || message.category_name
+          ensure_structure(hash, :aps)
+
+          hash[:aps][:sound] = message.sound_name if message.sound_name
+          hash[:aps][:badge] = message.badge_value if message.badge_value
+          hash[:aps][:'content-available'] = true if message.content_available_set
+          hash[:aps][:'mutable-content'] = true if message.mutable_content_set
+          hash[:aps][:category] = message.category_name if message.category_name
+        end
+
+        hash
       end
     end
   end

@@ -6,7 +6,7 @@ require_relative 'message'
 require_relative 'provider'
 require_relative 'flush_result'
 require_relative 'Exceptions/push_exception'
-require_relative 'GCM/gcm_provider'
+require_relative 'FCM/fcm_provider'
 require_relative 'APNS/apns_provider'
 
 module Push0r
@@ -43,9 +43,9 @@ module Push0r
           @queued_messages[message.handle] << message
         end
 
-        return true
+        true
       else
-        return false
+        false
       end
     end
 
@@ -69,7 +69,7 @@ module Push0r
       end
 
       @queued_messages = {}
-      return FlushResult.new(failed_messages, new_token_messages)
+      FlushResult.new(failed_messages, new_token_messages)
     end
   end
 end

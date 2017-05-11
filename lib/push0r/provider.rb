@@ -23,12 +23,24 @@ module Push0r
     # @see Message
     def end_push
       ## empty
-      return [[], []]
+      [[], []]
     end
 
     # Returns whether this provider supports the delivery to multiple recipients at once
     def supports_multiple_recipients?
-      return false
+      false
+    end
+
+    protected
+    def ensure_structure(input, *args)
+      current_hash = input
+
+      args.each do |arg|
+        if current_hash[arg].nil?
+          current_hash[arg] = {}
+        end
+        current_hash = current_hash[arg]
+      end
     end
   end
 end

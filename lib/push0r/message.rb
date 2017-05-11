@@ -7,8 +7,10 @@ module Push0r
   # @attr_reader [Integer] time_to_live the time to live in seconds for this push message
   # @attr_reader [String] collapse_key a collapse key for the message
   # @attr_reader [Object] handle the provider handle which indentifies the Provider that shall send this message
+
   class Message
     attr_reader :handle, :payload, :identifier, :receiver_tokens, :time_to_live, :collapse_key
+    attr_reader :alert_title, :alert_body, :alert_subtitle, :sound_name, :badge_value, :content_available_set, :mutable_content_set, :category_name, :color_name, :icon_name, :tag_name, :click_action_name
 
     # Creates a new Message instance
     # @param receiver_tokens [String, Array] the receiver's push tokens
@@ -36,18 +38,15 @@ module Push0r
     end
 
     # Convenience method that adds the required fields for an alert push
+    # subtitle is only available on APNS
     # @param [String] title the alert title to be displayed
     # @param [String] subtitle the alert subtitle to be displayed
     # @param [String] body the alert text to be displayed
     # @return [self] self
     def alert(title: nil, subtitle: nil, body: nil)
-      if title || subtitle || body
-        ensure_structure(:aps, :alert)
-
-        payload[:aps][:alert][:title] = title if title
-        payload[:aps][:alert][:subtitle] = subtitle if subtitle
-        payload[:aps][:alert][:body] = body if body
-      end
+      @alert_title = title
+      @alert_subtitle = subtitle
+      @alert_body = body
 
       self
     end
@@ -56,52 +55,77 @@ module Push0r
     # @param [String] sound_name the sound to be played
     # @return [self] self
     def sound(sound_name = 'default')
-      if sound_name
-        ensure_structure(:aps)
-        payload[:aps][:sound] = sound_name
-      end
+      @sound_name = sound_name
 
       self
     end
 
     # Convenience method that adds the required field for a badge change
+    # Only for APNS
     # @param [Integer] badge the badge value to be displayed
     # @return [self] self
     def badge(badge = 0)
-      if badge
-        ensure_structure(:aps)
-        payload[:aps][:badge] = badge.to_i
-      end
+      @badge_value = badge
 
       self
     end
 
     # Convenience method that adds the category field to the aps dictionary
+    # Only for APNS
     # @param [String] category the category this message belongs to (see UIUserNotificationCategory in apple's documentation)
     # @return [self] self
     def category(category)
-      if category
-        ensure_structure(:aps)
-        payload[:aps][:category] = category
-      end
+      @category_name = category
 
       self
     end
 
     # Sets the mutable-content flag
+    # Only for APNS
     # @return [self] self
     def mutable_content
-      ensure_structure(:aps)
-      payload[:aps][:'mutable-content'] = true
+      @mutable_content_set = true
 
       self
     end
 
     # Sets the content-available flag
+    # Only for APNS
     # @return [self] self
     def content_available
-      ensure_structure(:aps)
-      payload[:aps][:'content-available'] = true
+      @content_available_set = true
+
+      self
+    end
+
+    # Only for FCM
+    # @return [self] self
+    def icon(icon)
+      @icon_name = icon
+
+      self
+    end
+
+    # Only for FCM
+    # @return [self] self
+    def color(color)
+      @color_name = color
+
+      self
+    end
+
+    # Only for FCM
+    # @return [self] self
+    def tag(tag)
+      @tag_name = tag
+
+      self
+    end
+
+    # Only for FCM
+    # @return [self] self
+    def click_action(click_action)
+      @click_action_name = click_action
 
       self
     end
@@ -112,18 +136,6 @@ module Push0r
     def split
       return receiver_tokens.map do |token|
         Message.new(@handle, token, @collapse_key, @identifier, @time_to_live).attach(@payload)
-      end
-    end
-
-    private
-    def ensure_structure(*args)
-      current_hash = payload
-
-      args.each do |arg|
-        if current_hash[arg].nil?
-          current_hash[arg] = {}
-        end
-        current_hash = current_hash[arg]
       end
     end
   end
