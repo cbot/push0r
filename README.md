@@ -60,7 +60,7 @@ instance.flush
 Push0r API documentation can be found [here][apidocs].
 
 ## Error handling
-[Queue#flush][flush] returns an instance of [FlushResult][flushresult] which can be queried for [failed_messages][failed_messages]. This returns an array of [FailedMessage][failed_message] instances which in turn offer various attributes like the error code for the failed notification.
+[Push0r::Base#flush][flush] returns an instance of [FlushResult][flushresult] which can be queried for [failed_messages][failed_messages]. This returns an array of [FailedMessage][failed_message] instances which in turn offer various attributes like the error code for the failed notification.
 
 ## Bugs
 Please [report bugs][issues] on GitHub.
