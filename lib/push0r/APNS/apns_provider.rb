@@ -3,6 +3,7 @@ require 'openssl'
 require 'json'
 require 'securerandom'
 require_relative 'apns_provider_utils'
+require_relative 'apns_jwt_jar'
 
 module Push0r
   module APNS
@@ -53,31 +54,33 @@ module Push0r
     # APNSProvider is a {Provider} implementation to push notifications to iOS and OSX users using the Apple Push Notification Service.
     class APNSProvider < Provider
       include Push0r::APNS::ProviderUtils
+      attr_reader :environment, :topic, :certificate_data, :team_id, :key_id, :key_data
 
       # Returns a new APNSProvider instance using either a client certificate in PEM format or a signing key an JWT tokens
       # @param certificate_data [String] the Apple push certificate in PEM format
-      # @param environment [Fixnum] the environment to use when sending messages. Either Environment::PRODUCTION or Environment::SANDBOX. Defaults to Environment::PRODUCTION.
+      # @param environment [Integer] the environment to use when sending messages. Either Environment::PRODUCTION or Environment::SANDBOX. Defaults to Environment::PRODUCTION.
       # @param @team_id [String] the apple developer team id
       # @param @key_id [String] the signing key's id from the apple developer center
       # @param @key_data [String] the signing key as downloaded from the apple developer center
       # @param @topic [String] the topic (bundle id) to target
-      def initialize(environment:, topic: nil, certificate_data: nil, team_id: nil, key_id: nil, key_data: nil)
+      # @param @jwt_jar [Push0r::APNS::JWTJar] an optional custom object that handles JWT storage
+      def initialize(environment:, topic: nil, certificate_data: nil, team_id: nil, key_id: nil, key_data: nil, jwt_jar: nil)
         if ![Environment::PRODUCTION, Environment::SANDBOX].include?(environment)
           raise Push0r::Exceptions::PushException.new("invalid apns push environment: #{environment}")
         end
         @environment = environment
                 
         if team_id && key_id && key_data
-            raise Push0r::Exceptions::PushInitException.new("supply either a certificate or a team_id, a key_id and a key - not both") if !certificate_data.nil?
+            raise Push0r::Exceptions::PushInitException.new('supply either a certificate or a team_id, a key_id and a key - not both') if !certificate_data.nil?
             @team_id = team_id
             @key_id = key_id
             @key_data = key_data
-            @jwt = nil
-            @jwt_created_at = nil
+            @jwt_jar = jwt_jar || Push0r::APNS::JWTSimpleJar.new(Dir.tmpdir)
+            @jwt_jar.load_data(key_id)
             @mode = Mode::JWT
             @topic = topic
         elsif certificate_data
-            raise Push0r::Exceptions::PushInitException.new("supply either a certificate or a team_id, a key_id and a key - not both") if team_id || key_id || key_data
+            raise Push0r::Exceptions::PushInitException.new('supply either a certificate or a team_id, a key_id and a key - not both') if team_id || key_id || key_data
             @certificate_data = certificate_data
             @mode = Mode::CERTIFICATE
             if topic
@@ -86,10 +89,10 @@ module Push0r
               @topic = extract_first_topic_from_certificate(@certificate_data)
             end
         else
-          raise Push0r::Exceptions::PushInitException.new("Neither JWT nor certificate mode parameters given")
+          raise Push0r::Exceptions::PushInitException.new('neither JWT nor certificate mode parameters given')
         end
 
-        raise Push0r::Exceptions::PushInitException.new("Topic not set") if @topic.nil?
+        raise Push0r::Exceptions::PushInitException.new('topic not set') if @topic.nil?
         
         @messages = []
       end
@@ -114,7 +117,7 @@ module Push0r
         if @certificate_data
           begin
             ctx = OpenSSL::SSL::SSLContext.new
-            ctx.key = OpenSSL::PKey::RSA.new(@certificate_data, '')
+            ctx.key = OpenSSL::PKey::RSA.new(@certificate_data)
             ctx.cert = OpenSSL::X509::Certificate.new(@certificate_data)
           rescue StandardError => e
             raise Push0r::Exceptions::PushInitException.new("OpenSSL error: #{e}")
@@ -145,12 +148,12 @@ module Push0r
           }
           
           if @mode == Mode::JWT
-            if @jwt.nil? || @jwt_created_at.nil? || Time.now - @jwt_created_at > 2700
-              @jwt = generate_jwt(@team_id, @key_id, @key_data)
-              @jwt_created_at = Time.now
+            if @jwt_jar.jwt.nil? || @jwt_jar.jwt_created_at.nil? || Time.now - @jwt_jar.jwt_created_at > 2700
+              @jwt_jar.jwt = generate_jwt(@team_id, @key_id, @key_data)
+              @jwt_jar.jwt_created_at = Time.now
             end
           
-            headers['authorization'] = "bearer #{@jwt}"
+            headers['authorization'] = "bearer #{@jwt_jar.jwt}"
           end
           
           headers['apns-topic'] = @topic unless @topic.nil?
@@ -170,6 +173,13 @@ module Push0r
             begin
               resp = JSON.parse(response.body)
               error_code = error_code_for_reason(resp['reason'])
+
+              # wrong token, reset
+              if error_code == ErrorCodes::INVALID_PROVIDER_TOKEN
+                @jwt_jar.jwt = nil
+                @jwt_jar.jwt_created_at = nil
+              end
+
               failed_messages << FailedMessage.new(error_code, Array(device_token), message, self)
             rescue StandardError => e
               puts e

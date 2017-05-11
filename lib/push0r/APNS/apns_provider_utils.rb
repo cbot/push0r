@@ -16,7 +16,7 @@ module Push0r
       def generate_jwt(team_id, key_id, key_data)
         key = OpenSSL::PKey::EC.new key_data
       
-        payload = {:iss => team_id, :iat => Time.now.to_i}
+        payload = {iss: team_id, iat: Time.now.to_i}
         opts = {alg: 'ES256', key: key, kid: key_id}
         jwt = JsonWebToken.sign(payload, opts)
   
@@ -47,6 +47,7 @@ module Push0r
         begin
           extension_node = OpenSSL::ASN1.decode(extension)
           if extension_node.is_a?(OpenSSL::ASN1::Sequence)
+
             extension_node.each do |subnode|
               if subnode.is_a?(OpenSSL::ASN1::OctetString)
                 sequence_node = OpenSSL::ASN1.decode(subnode.value)
@@ -73,13 +74,13 @@ module Push0r
       end
 
       # @param [String] reason the reason string that is returned from APNS
-      # @return [Fixnum] the error code (from Push0r::ApnsErrorCodes) for the reason
+      # @return [Integer] the error code (from Push0r::ApnsErrorCodes) for the reason
       def error_code_for_reason(reason)
         codes = Push0r::APNS::ErrorCodes
         
         case reason
           when 'BadCertificate'
-            return codes::
+            return codes::BAD_CERTIFICATE
           when 'BadCertificateEnvironment'
             return codes::BAD_CERTIFICATE_ENVIRONMENT
           when 'BadCollapseId'

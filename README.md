@@ -5,14 +5,14 @@ push0r
 push0r is a ruby library that makes it easy to send push notifications to iOS, OSX and Android users.
 
 ## Installation
-Gemfile for Rails 3, Rails 4, Sinatra, and Merb:
+Gemfile:
 ``` ruby
-gem 'Push0r', '~> 0.6.0'
+gem 'push0r', '~> 0.6.0'
 ```
 
 Manual installation:
 ``` ruby
-gem install Push0r
+gem install push0r
 ```
 
 
@@ -21,23 +21,39 @@ gem install Push0r
 include Push0r
 
 # create a new Push0r instance
-pusher = Push0r::Base.new
+instance = Push0r::Base.new
+
+# add a certificate based APNS provider that pushes to iOS and macOS devices using the sandbox environment
+provider_cert = APNS::APNSProvider.new(environment: APNS::Environment::SANDBOX, certificate_data: File.read('__pemfile__'))
+instance.add_provider(provider_cert, as: :apns_cert)
+
+# add an auth key (JWT) based APNS provider that pushes to iOS and macOS devices using the production environment
+provider_jwt = APNS::APNSProvider.new(topic: '__bundleid__', team_id: '__teamid__', key_id: '__keyid__', key_data: File.read('__p8file__'))
+instance.add_provider(provider_jwt, as: :apns_jwt)
 
 # add a GCM service provider to push to Android devices
-pusher.add_provider(GCM::GCMProvider.new('__gcm_api_token__'), as: :gcm)
+provider_gcm = GCM::GCMProvider.new('__gcm_api_token__')
+instance.add_provider(provider_gcm, as: :gcm)
 
-# add a APNS service provider to push to iOS and macOS devices.
-pusher.add_provider(APNS::APNSProvider.new(File.read('aps.pem'), APNS::Environment::SANDBOX), as: :apns_sandbox)
-pusher.add_provider(APNS::APNSProvider.new(File.read('aps.pem'), APNS::Environment::PRODUCTION), as: :apns_production)
+# enqueu a Message to be sent to iOS/macOS using the auth key (JWT) based APNS provider
+jwt_message = Message.new(:apns_jwt, '__devicetoken__')
+jwt_message.alert(title: 'Hi there', body: 'Sent via jwt auth')
+instance.queue(jwt_message)
 
-# queue a gcm message and attach a dummy payload
-pusher.queue(Message.new(:gcm, '__registration_id__', collapse_key: 'test').attach({"data" => {"d" => "1"}}))
+# enqueu another Message to be sent to iOS/macOS using the certificate based APNS provider
+# this message also sets the app's batch and plays a sound
+cert_message = Message.new(:apns_jwt, '__devicetoken__')
+cert_message.alert(title: 'Hi there', body: 'Sent via certificate auth').sound.batch(2)
+instance.queue(cert_message)
 
-# queue a apns message and attach a dummy payload
-pusher.queue(Message.new(:apns_sandbox, '__device_token__').attach({"data" => {"d" => "1"}}))
+# enqueu a gcm message and attach a dummy payload
+gcm_message = Message.new(:gcm, '__registration_id__', collapse_key: 'test')
+gcm_message.attach({data: {action: 'test'}})
+instance.queue(gcm_message)
+
 
 # flush the queue to actually transmit the messages
-pusher.flush
+instance.flush
 ```
 
 ## Documentation

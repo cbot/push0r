@@ -7,3 +7,4 @@ doc
 .idea
 *.pem
 *.p8
+*.yaml
