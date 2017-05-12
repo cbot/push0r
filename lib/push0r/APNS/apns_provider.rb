@@ -64,7 +64,7 @@ module Push0r
       # @param @key_data [String] the signing key as downloaded from the apple developer center
       # @param @topic [String] the topic (bundle id) to target
       # @param @jwt_jar [Push0r::APNS::JWTJar] an optional custom object that handles JWT storage
-      def initialize(environment:, topic: nil, certificate_data: nil, team_id: nil, key_id: nil, key_data: nil, jwt_jar: nil)
+      def initialize(environment: Environment::PRODUCTION, topic: nil, certificate_data: nil, team_id: nil, key_id: nil, key_data: nil, jwt_jar: nil)
         unless [Environment::PRODUCTION, Environment::SANDBOX].include?(environment)
           raise Push0r::Exceptions::PushException.new("invalid apns push environment: #{environment}")
         end
@@ -129,7 +129,7 @@ module Push0r
         failed_messages = []
 
         @messages.dup.each do |message|
-          payload = message.payload
+          payload = build_payload(message)
           json = payload.to_json
 
           # determine priority
@@ -201,7 +201,6 @@ module Push0r
         hash = message.payload
         if message.alert_title || message.alert_body || message.alert_subtitle
           ensure_structure(hash, :aps, :alert)
-
           hash[:aps][:alert][:body] = message.alert_body if message.alert_body
           hash[:aps][:alert][:title] = message.alert_title if message.alert_title
           hash[:aps][:alert][:subtitle] = message.alert_subtitle if message.alert_subtitle
