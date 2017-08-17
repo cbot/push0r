@@ -211,8 +211,8 @@ module Push0r
 
           hash[:aps][:sound] = message.sound_name if message.sound_name
           hash[:aps][:badge] = message.badge_value if message.badge_value
-          hash[:aps][:'content-available'] = true if message.content_available_set
-          hash[:aps][:'mutable-content'] = true if message.mutable_content_set
+          hash[:aps][:'content-available'] = 1 if message.content_available_set
+          hash[:aps][:'mutable-content'] = 1 if message.mutable_content_set
           hash[:aps][:category] = message.category_name if message.category_name
         end
 
