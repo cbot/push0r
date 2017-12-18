@@ -9,7 +9,7 @@ module Push0r
   # @attr_reader [Object] handle the provider handle which indentifies the Provider that shall send this message
 
   class Message
-    attr_reader :handle, :payload, :identifier, :receiver_tokens, :time_to_live, :collapse_key
+    attr_reader :handle, :payload, :identifier, :receiver_tokens, :time_to_live, :collapse_key, :priority
     attr_reader :alert_title, :alert_body, :alert_subtitle, :sound_name, :badge_value, :content_available_set, :mutable_content_set, :category_name, :color_name, :icon_name, :tag_name, :click_action_name
 
     # Creates a new Message instance
@@ -18,12 +18,13 @@ module Push0r
     # @param time_to_live [Integer] The time to live in seconds for this push messages. If nil, the time to live depends on the provider used to transmit the message.
     # @param [Object] handle the provider handle which indentifies the Provider that shall send this message
     # @param [String] collapse_key a collapse key for the message
-    def initialize(handle, receiver_tokens, collapse_key: nil, identifier: nil, time_to_live: nil)
+    def initialize(handle, receiver_tokens, collapse_key: nil, identifier: nil, time_to_live: nil, priority: nil)
       @handle = handle
       @receiver_tokens = Array(receiver_tokens).uniq
       @identifier = identifier
       @time_to_live = time_to_live
       @collapse_key = collapse_key
+      @priority = priority
       @payload = {}
     end
 

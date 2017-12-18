@@ -72,10 +72,12 @@ module Push0r
             if message.collapse_key && !message.collapse_key.empty?
               payload.merge!({collapse_key: message.collapse_key})
             end
+            
+            if message.priority && !message.priority.empty?
+                payload.merge!({priority: message.priority})
+            end
 
             request.body = payload.to_json
-            
-            puts(payload.to_json)
             
             response = http.request(request)
           rescue SocketError
