@@ -59,6 +59,9 @@ module Push0r
             request = Net::HTTP::Post.new(uri.path, {'Content-Type' => 'application/json', 'Authorization' => "key=#{@api_key}"})
 
             payload = {data: message.payload, notification: build_notification_hash(message)}
+            if (payload[:notification] || {}).empty?
+              payload.delete(:notification)
+            end
 
             if message.receiver_tokens.count == 1
               payload.merge!({to: message.receiver_tokens.first})
@@ -71,6 +74,9 @@ module Push0r
             end
 
             request.body = payload.to_json
+            
+            puts(payload.to_json)
+            
             response = http.request(request)
           rescue SocketError
             ## connection error
@@ -142,7 +148,7 @@ module Push0r
         hash = {}
         hash[:title] = message.alert_title unless message.alert_title.nil?
         hash[:body] = message.alert_body unless message.alert_body.nil?
-        hash[:sound] = message.sound_name
+        hash[:sound] = message.sound_name unless message.sound_name.nil?
         hash[:color] = message.color_name unless message.color_name.nil?
         hash[:icon] = message.icon_name unless message.icon_name.nil?
         hash[:tag] = message.tag_name unless message.tag_name.nil?
