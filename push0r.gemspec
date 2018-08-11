@@ -10,7 +10,7 @@ Gem::Specification.new do |s|
   s.homepage    = 'https://github.com/cbot/push0r'
   s.license     = 'MIT'
 
-  s.add_runtime_dependency 'net-http2', '~> 0.15.0'
-  s.add_runtime_dependency 'json_web_token', '~> 0.3.4'
-  s.add_runtime_dependency 'openssl', '>= 2.0.3'
+  s.add_runtime_dependency 'net-http2', '~> 0.18.0'
+  s.add_runtime_dependency 'json_web_token', '~> 0.3.5'
+  s.add_runtime_dependency 'openssl', '>= 2.1.0'
 end
