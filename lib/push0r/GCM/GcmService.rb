@@ -55,7 +55,7 @@ module Push0r
       failed_messages = []
       new_registration_messages = []
 
-      uri = URI.parse('https://android.googleapis.com/gcm/send')
+      uri = URI.parse('https://fcm.googleapis.com/fcm/send')
       http = Net::HTTP.new(uri.host, uri.port)
       http.use_ssl = true
 
