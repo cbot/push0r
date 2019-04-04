@@ -9,3 +9,4 @@ doc
 *.der
 *.p12
 test.rb
+*.p8
